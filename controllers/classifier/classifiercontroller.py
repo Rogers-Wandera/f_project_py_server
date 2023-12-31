@@ -4,7 +4,7 @@ import os
 
 ClassifierObj = PersonClassifier()
 
-def Classifier():
+def PredictWithLocalImage():
    try:
         if not request.is_json:
             return jsonify({"error": "No Json data provided"}), 400

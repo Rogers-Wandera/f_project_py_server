@@ -3,13 +3,8 @@ from routes.approute import CreateApp
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
-import asyncio
-from middlewares import VerifyJwt
-from middlewares import VerifyRoles
 from conn import rolelist,connector
 from utils.imageloader import ImageLoader
-verifyJwt = VerifyJwt.VerifyJwt
-USER_ROLES = rolelist.USER_ROLES
 
 load_dotenv()
 
@@ -36,8 +31,6 @@ def before_request():
 def teardown_request(exception):
     if hasattr(g, 'db'):
         g.db.disconnect()
-
-
 
 @app.errorhandler(404)
 def not_found_error(error):
