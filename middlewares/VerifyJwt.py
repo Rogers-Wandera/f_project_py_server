@@ -1,9 +1,11 @@
 from flask import jsonify, request
 from flask_jwt_extended import decode_token, exceptions
 import time
+from functools import wraps
 
-def VerifyJwt(request_function):
-    def wrapper(*args, **kwargs):
+def verifyjwt(request_function):
+    @wraps(request_function)
+    def jwt_verify_wrapper(*args, **kwargs):
         try:
             auth_header = request.headers.get('Authorization', '')
             if not auth_header.startswith("Bearer"):
@@ -25,4 +27,4 @@ def VerifyJwt(request_function):
 
         return request_function(*args, **kwargs)
 
-    return wrapper
+    return jwt_verify_wrapper
