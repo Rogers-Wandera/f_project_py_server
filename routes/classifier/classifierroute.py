@@ -1,5 +1,5 @@
 from flask import Blueprint
-from controllers.classifier.classifiercontroller import PredictWithLocalImage, TrainClassifier
+from controllers.classifier.classifiercontroller import PredictWithLocalImage, TrainClassifier, RealTimeDetection
 from middlewares.VerifyJwt import verifyjwt
 from middlewares.VerifyRoles import verifyroles
 from conn.rolelist import USER_ROLES
@@ -17,3 +17,9 @@ def PredictWithImage():
 @verifyroles(USER_ROLES['Admin'])
 def TrainModel():
     return TrainClassifier()
+
+@classifier_bp.route("/realtime", methods=["GET"])
+@verifyjwt
+@verifyroles(USER_ROLES['Admin'])
+def GetRealTimeDetection():
+    return RealTimeDetection()

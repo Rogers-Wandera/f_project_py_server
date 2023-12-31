@@ -197,3 +197,45 @@ class PersonClassifier(ImageLoader):
         except Exception as e:
             print(f"Error predicting: {e}")
             raise e
+    
+    def detect_bounding_box(self, vid):
+        gray_image = cv2.cvtColor(vid, cv2.COLOR_BGR2GRAY)
+        faces = self.faceDetection(gray_image)
+        for (x,y,w,h) in faces:
+            cv2.rectangle(vid, (x,y), (x+w,y+h), (0,255,0), 4)
+        return faces
+    
+    def create_real_time_detection(self, video_url=0):
+        video_capture= cv2.VideoCapture(video_url)
+        recognizer = self.load_recognizer()
+        video_stream = True
+        while video_stream:
+            results, video_frame = video_capture.read()
+            if results is False:
+                break #break out of the video capture loop
+
+            faces = self.detect_bounding_box(video_frame) # call the detect_bounding_box function
+            for (x,y,w,h) in faces:
+                face_roi = video_frame[y:y+h, x:x+w]
+                face_roi = cv2.fastNlMeansDenoising(face_roi, None, h=10, searchWindowSize=21)
+                face_roi = cv2.GaussianBlur(face_roi, (5, 5), 0)
+                # turn image in gray scale
+                gray_image = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+                label, confidence = recognizer.predict(gray_image)
+                label_mapping = self.load_label_mapping()
+                for labelx in label_mapping:
+                    if label_mapping[labelx] == label:
+                        label = labelx
+                # show label and confidence on video frame
+                text = f"{label}: {confidence:.2f}"
+                cv2.putText(video_frame, text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+
+            cv2.imshow("Video Frame", video_frame)
+            key = cv2.waitKey(1)
+            if key in [ord('q'), 27, 255]:
+                video_stream = False
+        video_capture.release()
+        cv2.destroyAllWindows()
+
+        if not video_stream:
+            print("Video stream ended.")

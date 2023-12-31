@@ -44,3 +44,10 @@ def TrainClassifier():
         return jsonify({"msg": "Model Trained successfully"}), 200
    except Exception as e:
     return jsonify({"error": str(e)}), 400
+
+def RealTimeDetection():
+    try:
+        ClassifierObj.create_real_time_detection()
+        return jsonify({"msg": "Realtime detection ended successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400

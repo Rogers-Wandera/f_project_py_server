@@ -1,9 +1,9 @@
-from flask import Flask, render_template, request, jsonify, g
+from flask import jsonify, g
 from routes.approute import CreateApp
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
-from conn import rolelist,connector
+from conn import connector
 from utils.imageloader import ImageLoader
 
 load_dotenv()
