@@ -31,8 +31,19 @@ def PredictWithLocalImage():
         if image_file_data is None:
             return jsonify({"error": "Failed to read image file"}), 400
         
-        label, confidence = ClassifierObj.predictImageFile(image_file_data)
-        return jsonify({"label": label, "confidence": confidence}), 200
+        width = None
+        height = None
+        
+        if "width" in json_data and "height" in json_data:
+            width = json_data['width']
+            height = json_data['height']
+        
+        if width is None or height is None:
+            faces_list = ClassifierObj.predictImageFile(image_file_data)
+            return jsonify(faces_list), 200
+        else:
+            faces_list = ClassifierObj.predictImageFile(image_file_data,40, (width, height))
+            return jsonify(faces_list), 200
 
    except Exception as e:
         return jsonify({"error": str(e)}), 400

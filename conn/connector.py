@@ -1,12 +1,13 @@
 import mysql.connector as mysql
+from conn.config import config
 
 class Connection:
-    def __init__(self, host,user,password,database,port):
-        self.host = host
-        self.user = user
-        self.password = password
-        self.database = database
-        self.port = port
+    def __init__(self):
+        self.host = config["host"]
+        self.user = config["user"]
+        self.password = config["password"]
+        self.database = config["database"]
+        self.port = config["port"]
         self.connection = None
     
     def connect(self):
@@ -18,20 +19,34 @@ class Connection:
                 database = self.database,
                 port = self.port
             )
-            if self.connection.is_connected():
-                return self.connection
-        except mysql.connector.Error as err:
+            if not self.connection.is_connected():
+                raise mysql.Error("Connection not established")
+            return self.connection
+        except mysql.Error as err:
             raise err
-    def execute_query(self, query):
+    def executeQuery(self,query):
         try:
-            cursor = self.connection.cursor()
-            cursor.execute(query)
+           if self.connection is None:
+               self.connect()
+           if not self.connection.is_connected():
+               raise mysql.Error("Connection not established")
+            
+           cursor = self.connection.cursor(dictionary=True)
+           cursor.execute(query)
+           return cursor
+        except mysql.Error as err:
+            raise err
+    
+    def findall(self, table, conditions=None):
+        try:
+            query = "SELECT *FROM {}".format(table)
+            cursor = self.executeQuery(query)
             results = cursor.fetchall()
-            cursor.close()
             return results
-        except mysql.connector.Error as err:
-            print(f"Error: {err}")
-            return None
+        except mysql.Error as err:
+            raise err
     def disconnect(self):
+        if self.connection is None:
+            return
         if self.connection.is_connected():
             self.connection.close()
