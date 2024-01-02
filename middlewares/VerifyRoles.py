@@ -1,6 +1,8 @@
 from conn import rolelist
 from functools import wraps
 from flask import jsonify,request
+from utils.logger import Logger
+security_logger = Logger()
 USER_ROLES = rolelist.USER_ROLES
 
 def verifyroles(*args):
@@ -19,8 +21,13 @@ def verifyroles(*args):
             check_results = any(results)
             if not check_results:
                 raise Exception("not authorized to access this route")
+            
+            user = request.user
+            userinfo = f"User: {user['displayName']} id: {user['id']}"
+            action = f"{req.method} {req.path}"
+            security_logger.logaccess(userinfo, action)
         except Exception as e:
-            return jsonify({'error': f'{e}'}), 401
+            return jsonify({'error': f'{e}'}), 401      
         return request_function(*func_args, **kwargs)
       return roles_wrapper
    return decorator

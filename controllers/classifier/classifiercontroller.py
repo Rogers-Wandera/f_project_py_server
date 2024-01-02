@@ -1,11 +1,12 @@
 from utils.classifier import PersonClassifier
 from flask import request, jsonify
+from utils.logger import Logger
 import os
 
 ClassifierObj = PersonClassifier()
 
 def PredictWithLocalImage():
-   try:
+   try: 
         if not request.is_json:
             return jsonify({"error": "No Json data provided"}), 400
         

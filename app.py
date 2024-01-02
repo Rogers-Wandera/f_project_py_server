@@ -3,7 +3,6 @@ from routes.approute import CreateApp
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
-from conn.connector import Connection
 # from conn.config import config
 from utils.imageloader import ImageLoader
 
@@ -18,17 +17,8 @@ app.config['JWT_SECRET_KEY'] = JWT_SECRET
 
 jwt = JWTManager(app)
 
-@app.before_request
-def before_request():
-    g.db = Connection()
-    try:
-        g.db.connect()
-    except Exception as e:
-        app.logger.error(f"Error connecting to the database: {str(e)}")
-# @app.teardown_request
-# def teardown_request(exception):
-#     if hasattr(g, 'db'):
-#         g.db.disconnect()
+# @app.before_request
+# def before_request():
 
 @app.errorhandler(404)
 def not_found_error(error):

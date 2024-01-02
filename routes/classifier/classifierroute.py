@@ -5,7 +5,6 @@ from middlewares.VerifyRoles import verifyroles
 from conn.rolelist import USER_ROLES
 classifier_bp = Blueprint("main", __name__)
 
-
 @classifier_bp.route("/", methods=["POST"])
 @verifyjwt
 @verifyroles(USER_ROLES['Admin'])
