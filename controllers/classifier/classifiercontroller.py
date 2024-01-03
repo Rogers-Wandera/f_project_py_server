@@ -1,12 +1,11 @@
 from utils.classifier import PersonClassifier
 from flask import request, jsonify
-from utils.logger import Logger
 import os
 
 ClassifierObj = PersonClassifier()
 
 def PredictWithLocalImage():
-   try: 
+   try:
         if not request.is_json:
             return jsonify({"error": "No Json data provided"}), 400
         
@@ -48,6 +47,34 @@ def PredictWithLocalImage():
 
    except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+def PredictWithImageUrl():
+        if not request.is_json:
+            return jsonify({"error": "No Json data provided"}), 400
+        
+        json_data = request.get_json()
+        if 'image' not in json_data:
+            return jsonify({"error": "No image provided"}), 400
+        
+        imagedata = json_data['image']
+        image_file_data = None
+        if imagedata is None:
+            return jsonify({"error": "No image provided"}), 400
+        required_keys = ['url']
+
+        if not all(key in imagedata for key in required_keys):
+            return jsonify({"error": "Missing required keys"}), 400
+        
+        image_file_data = ClassifierObj._read_image_from_url(imagedata['url'])
+        if image_file_data is None:
+            return jsonify({"error": "Failed to read image file"}), 400
+        
+        # predicting the image
+        label, confidence = ClassifierObj.predict_with_url(imagedata['url'])
+        return jsonify({"label": label, "confidence": confidence}), 200
+        
+
 
 def TrainClassifier():
    try:

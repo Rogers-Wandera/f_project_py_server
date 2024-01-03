@@ -4,6 +4,12 @@ import numpy as np
 from utils.imageloader import ImageLoader
 import json
 from conn.connector import Connection
+import tensorflow as tf
+from sklearn.svm import SVC
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
 
 dbconnect = Connection()
 class PersonClassifier(ImageLoader):
@@ -147,13 +153,7 @@ class PersonClassifier(ImageLoader):
             for labelx in label_mapping:
                 if label_mapping[labelx] == label:
                     label = labelx
-
-            # Check if the recognition confidence is above the threshold
-            if confidence < confidence_threshold:
-                # Recognition failed
-                return None, None
-            else:
-                return label, confidence
+            return label, confidence
         except Exception as e:
             print(f"Error predicting: {e}")
             raise e
