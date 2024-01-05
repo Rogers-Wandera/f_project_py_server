@@ -1,15 +1,11 @@
+import sys
 import cv2
 import requests
 import numpy as np
 from utils.imageloader import ImageLoader
 import json
 from conn.connector import Connection
-import tensorflow as tf
-from sklearn.svm import SVC
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score
-import joblib
+
 
 dbconnect = Connection()
 class PersonClassifier(ImageLoader):
