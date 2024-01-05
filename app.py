@@ -5,14 +5,14 @@ from dotenv import load_dotenv
 import os
 # from conn.config import config
 from utils.imageloader import ImageLoader
-from utils.personaudio import PersonAudio
+# from utils.personaudio import PersonAudio
 
 load_dotenv()
 
-obj = PersonAudio(label_path="personsaudiolabels", model_path="personsaudiomodel")
-pathurl = r"C:\Users\Rogers\Downloads\WhatsApp Unknown 2024-01-05 at 11.48.12 AM\test.ogg"
-results = obj._predict_person_audio(pathurl)
-print(results)
+# obj = PersonAudio(label_path="personsaudiolabels", model_path="personsaudiomodel")
+# pathurl = r"C:\Users\Rogers\Downloads\WhatsApp Unknown 2024-01-05 at 11.48.12 AM\test.ogg"
+# results = obj._predict_person_audio(pathurl)
+# print(results)
 # obj._train_person_audio_model("personsaudio", type="cloudinary")
 # X_train, X_test, y_train, y_test=obj._load_cloudinary_dataset("personsaudio", max_results=500)
 
