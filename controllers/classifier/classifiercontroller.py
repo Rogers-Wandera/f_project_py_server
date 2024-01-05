@@ -66,12 +66,12 @@ def PredictWithImageUrl():
         if not all(key in imagedata for key in required_keys):
             return jsonify({"error": "Missing required keys"}), 400
         
-        image_file_data = ClassifierObj._read_image_from_url(imagedata['url'])
+        image_file_data = ClassifierObj.read_image_from_url(imagedata['url'])
         if image_file_data is None:
             return jsonify({"error": "Failed to read image file"}), 400
         
         # predicting the image
-        label, confidence = ClassifierObj.predict_with_url(imagedata['url'])
+        label, confidence = ClassifierObj.predictWithUrl(imagedata['url'])
         return jsonify({"label": label, "confidence": confidence}), 200
         
 
