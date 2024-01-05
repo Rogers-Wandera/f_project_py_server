@@ -1,9 +1,9 @@
-from flask import Flask, render_template, request, jsonify, g
+from flask import jsonify, g
 from routes.approute import CreateApp
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
-from conn import rolelist,connector
+# from conn.config import config
 from utils.imageloader import ImageLoader
 
 load_dotenv()
@@ -17,20 +17,8 @@ app.config['JWT_SECRET_KEY'] = JWT_SECRET
 
 jwt = JWTManager(app)
 
-@app.before_request
-def before_request():
-    g.db = connector.Connection(
-        host = os.getenv('DB_HOST'),
-        user = os.getenv('DB_USER'),
-        password = os.getenv('DB_PASSWORD'),
-        database = os.getenv('DB_NAME'),
-        port = os.getenv('DB_PORT')
-    )
-    g.db.connect()
-@app.teardown_request
-def teardown_request(exception):
-    if hasattr(g, 'db'):
-        g.db.disconnect()
+# @app.before_request
+# def before_request():
 
 @app.errorhandler(404)
 def not_found_error(error):
