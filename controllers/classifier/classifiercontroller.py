@@ -31,11 +31,50 @@ def PredictWithLocalImage():
         if image_file_data is None:
             return jsonify({"error": "Failed to read image file"}), 400
         
-        label, confidence = ClassifierObj.predictImageFile(image_file_data)
-        return jsonify({"label": label, "confidence": confidence}), 200
+        width = None
+        height = None
+        
+        if "width" in json_data and "height" in json_data:
+            width = json_data['width']
+            height = json_data['height']
+        
+        if width is None or height is None:
+            faces_list = ClassifierObj.predictImageFile(image_file_data)
+            return jsonify(faces_list), 200
+        else:
+            faces_list = ClassifierObj.predictImageFile(image_file_data,40, (width, height))
+            return jsonify(faces_list), 200
 
    except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+
+def PredictWithImageUrl():
+        if not request.is_json:
+            return jsonify({"error": "No Json data provided"}), 400
+        
+        json_data = request.get_json()
+        if 'image' not in json_data:
+            return jsonify({"error": "No image provided"}), 400
+        
+        imagedata = json_data['image']
+        image_file_data = None
+        if imagedata is None:
+            return jsonify({"error": "No image provided"}), 400
+        required_keys = ['url']
+
+        if not all(key in imagedata for key in required_keys):
+            return jsonify({"error": "Missing required keys"}), 400
+        
+        image_file_data = ClassifierObj._read_image_from_url(imagedata['url'])
+        if image_file_data is None:
+            return jsonify({"error": "Failed to read image file"}), 400
+        
+        # predicting the image
+        label, confidence = ClassifierObj.predict_with_url(imagedata['url'])
+        return jsonify({"label": label, "confidence": confidence}), 200
+        
+
 
 def TrainClassifier():
    try:

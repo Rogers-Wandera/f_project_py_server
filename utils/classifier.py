@@ -3,7 +3,15 @@ import requests
 import numpy as np
 from utils.imageloader import ImageLoader
 import json
+from conn.connector import Connection
+import tensorflow as tf
+from sklearn.svm import SVC
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+import joblib
 
+dbconnect = Connection()
 class PersonClassifier(ImageLoader):
     """A class for training and using a facial recognition model."""
     def __init__(self):
@@ -12,13 +20,13 @@ class PersonClassifier(ImageLoader):
     def faceDetection(self, img):
         try:
             face_classifier = cv2.CascadeClassifier( cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-            face = face_classifier.detectMultiScale(img, scaleFactor=1.1, minNeighbors=5, minSize=(40,40))
+            face = face_classifier.detectMultiScale(img, scaleFactor=1.1, minNeighbors=4)
             return face
         except Exception as e:
             print(f"Error loading cascade classifier: {e}")
             raise e
 
-    def read_image_from_url(self, url,target_size=(600, 600)):
+    def read_image_from_url(self, url,target_size=(400, 500)):
         """
         Read an image from a URL, convert it to grayscale, and resize it.
 
@@ -31,9 +39,9 @@ class PersonClassifier(ImageLoader):
         """
         response = requests.get(url)
         img_array = np.array(bytearray(response.content), dtype=np.uint8)
-        img = cv2.imdecode(img_array, cv2.IMREAD_GRAYSCALE)
-        img = cv2.fastNlMeansDenoising(img, None, h=10, searchWindowSize=21)
-        img = cv2.GaussianBlur(img, (5, 5), 0)
+        img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = cv2.fastNlMeansDenoising(img, None, h=10, templateWindowSize=5, searchWindowSize=21)
         img = cv2.resize(img, target_size)
         return img
     
@@ -55,6 +63,11 @@ class PersonClassifier(ImageLoader):
                 image_path = file['secure_url']
                 img = self.read_image_from_url(image_path)
                 if img is not None:
+                    faces = self.faceDetection(img)
+                    if len(faces) == 0:
+                       continue
+                    x, y, w, h = faces[0]
+                    img = img[y:y+h, x:x+w]
                     images.append(img)
                     labels.append(file['label'])
         return images, labels
@@ -85,12 +98,27 @@ class PersonClassifier(ImageLoader):
         except Exception as e:
             print(f"Error creating recognizer: {e}")
             raise e
+        
+    def getlabeluser(self, label):
+        try:
+            # get all persons from db
+            results = dbconnect.findall("person")
+            row = None
+            for result in results:
+                if result['id'] == label:
+                    row = result
+            return row
+        except Exception as e:
+            raise e
     
     def load_label_mapping(self):
-        label_mapping = None
-        with open("label_mapping.json", "r") as json_file:
-            label_mapping = json.load(json_file)
-        return label_mapping
+        try:
+            label_mapping = None
+            with open("label_mapping.json", "r") as json_file:
+                label_mapping = json.load(json_file)
+            return label_mapping
+        except Exception as e:
+            raise e
             
 
     def load_recognizer(self):
@@ -125,13 +153,7 @@ class PersonClassifier(ImageLoader):
             for labelx in label_mapping:
                 if label_mapping[labelx] == label:
                     label = labelx
-
-            # Check if the recognition confidence is above the threshold
-            if confidence < confidence_threshold:
-                # Recognition failed
-                return None, None
-            else:
-                return label, confidence
+            return label, confidence
         except Exception as e:
             print(f"Error predicting: {e}")
             raise e
@@ -149,54 +171,51 @@ class PersonClassifier(ImageLoader):
             print(f"Error predicting: {e}")
             raise e
     
-    def getFaces(self, gray_img):
+    def getFaces(self, gray_img,target_size):
         try:
-            faces = self.faceDetection(gray_img)
+            img = cv2.fastNlMeansDenoising(gray_img, None, h=10, templateWindowSize=5, searchWindowSize=21)
+            img = cv2.resize(img, target_size)
+            faces = self.faceDetection(img)
             if len(faces) == 0:
                 raise Exception("No face detected")
-
-            x, y, w, h = faces[0]
-            face_roi = gray_img[y:y+h, x:x+w]
-            # Additional pre-processing steps (e.g., Gaussian blur, denoising)
-            face_roi = cv2.fastNlMeansDenoising(face_roi, None, h=10, searchWindowSize=21)
-            face_roi = cv2.GaussianBlur(face_roi, (5, 5), 0)
-            return face_roi
+            newfaces = []
+            for (x, y, w, h) in faces:
+                face_roi = img[y:y+h, x:x+w]
+                newfaces.append(face_roi)
+            return newfaces
         except Exception as e:
             raise e
 
         
-    def predictImageFile(self, imagedata, confidence_threshold=40, target_size=(600, 600)):
+    def predictImageFile(self, imagedata, confidence_threshold=40, target_size=(400, 500)):
         try:
             recognizer = self.load_recognizer()
             nparray = np.frombuffer(imagedata, np.uint8)
             test_image = cv2.imdecode(nparray, cv2.IMREAD_GRAYSCALE)
-            face_roi = self.getFaces(test_image)
+            face_roi = self.getFaces(test_image, target_size)
             if face_roi is None:
-                return None, None
-            face_roi = cv2.resize(face_roi, target_size)
+                return None, None,
             
+            faces_list = []
             # # Recognition using the pre-processed face
-            label, confidence = recognizer.predict(face_roi)
-
-            # get label mappings
-            label_mapping = self.load_label_mapping()
-            if label_mapping is None:
-                return None, None
-            
-            for labelx in label_mapping:
-                if label_mapping[labelx] == label:
-                    label = labelx
-
-            # Check if the recognition confidence is above the threshold
-            if confidence < confidence_threshold:
-                # Recognition failed
-                return None, None
-            else:
-                return label, confidence
+            for face in face_roi:
+                label, confidence = recognizer.predict(face)
+                # get label mappings
+                label_mapping = self.load_label_mapping()
+                if label_mapping is None:
+                    return None, None
+                
+                for labelx in label_mapping:
+                    if label_mapping[labelx] == label:
+                        label = labelx
+                faces_list.append({"label": label, "confidence": confidence})
+            return faces_list
 
         except Exception as e:
             print(f"Error predicting: {e}")
             raise e
+        finally:
+            dbconnect.disconnect()
     
     def detect_bounding_box(self, vid):
         gray_image = cv2.cvtColor(vid, cv2.COLOR_BGR2GRAY)
@@ -206,36 +225,46 @@ class PersonClassifier(ImageLoader):
         return faces
     
     def create_real_time_detection(self, video_url=0):
-        video_capture= cv2.VideoCapture(video_url)
-        recognizer = self.load_recognizer()
-        video_stream = True
-        while video_stream:
-            results, video_frame = video_capture.read()
-            if results is False:
-                break #break out of the video capture loop
+        try:
+            video_capture= cv2.VideoCapture(video_url)
+            recognizer = self.load_recognizer()
+            video_stream = True
+            while video_stream:
+                results, video_frame = video_capture.read()
+                if results is False:
+                    break #break out of the video capture loop
 
-            faces = self.detect_bounding_box(video_frame) # call the detect_bounding_box function
-            for (x,y,w,h) in faces:
-                face_roi = video_frame[y:y+h, x:x+w]
-                face_roi = cv2.fastNlMeansDenoising(face_roi, None, h=10, searchWindowSize=21)
-                face_roi = cv2.GaussianBlur(face_roi, (5, 5), 0)
-                # turn image in gray scale
-                gray_image = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
-                label, confidence = recognizer.predict(gray_image)
-                label_mapping = self.load_label_mapping()
-                for labelx in label_mapping:
-                    if label_mapping[labelx] == label:
-                        label = labelx
-                # show label and confidence on video frame
-                text = f"{label}: {confidence:.2f}"
-                cv2.putText(video_frame, text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                faces = self.detect_bounding_box(video_frame) # call the detect_bounding_box function
+                for (x,y,w,h) in faces:
+                    face_roi = video_frame[y:y+h, x:x+w]
+                    face_roi = cv2.fastNlMeansDenoising(face_roi, None, h=10,templateWindowSize=5, searchWindowSize=21)
+                    # face_roi = cv2.GaussianBlur(face_roi, (5, 5), 0)
+                    # turn image in gray scale
+                    gray_image = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+                    label, confidence = recognizer.predict(gray_image)
+                    label_mapping = self.load_label_mapping()
+                    user = None
+                    nameprefix = None
+                    for labelx in label_mapping:
+                        if label_mapping[labelx] == label:
+                            userdata = self.getlabeluser(labelx)
+                            if userdata is not None:
+                                user = f"{userdata['firstName']} {userdata['lastName']}"
+                                nameprefix = f"{userdata['firstName'][0]}.{userdata['lastName'][0]}"
+                            label = labelx
+                    # show label and confidence on video frame
+                    prefix = "Unknown" if user is None else nameprefix # first and last latter of the name
+                    text = f"{prefix}: {confidence:.2f}"
+                    cv2.putText(video_frame, text, (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-            cv2.imshow("Video Frame", video_frame)
-            key = cv2.waitKey(1)
-            if key in [ord('q'), 27, 255]:
-                video_stream = False
-        video_capture.release()
-        cv2.destroyAllWindows()
+                cv2.imshow("Video Frame", video_frame)
+                key = cv2.waitKey(1)
+                if key in [ord('q'), 27, 255]:
+                    video_stream = False
+            video_capture.release()
+            cv2.destroyAllWindows()
 
-        if not video_stream:
-            print("Video stream ended.")
+            if not video_stream:
+                print("Video stream ended.")
+        except Exception as e:
+            raise e
