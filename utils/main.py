@@ -8,10 +8,8 @@ import os
 import io
 import json
 from utils.imageloader import ImageLoader
-from dotenv import load_dotenv
 import requests
 
-load_dotenv()
 
 class MainAudioClassifier(ImageLoader):
     def __init__(self):
