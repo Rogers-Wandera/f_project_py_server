@@ -1,5 +1,4 @@
 import numpy as np
-import tensorflow as tf
 from keras import layers
 from keras.models import Sequential
 import cv2 as cv
@@ -17,41 +16,6 @@ class ImagePersonClassifier:
     def __init__(self):
         self.labels = []
         self.accuracy = 0
-
-    def _face_detection(self, image, conf_threshold=0.8):
-        """
-        This function is for face detection using OpenCv DNN
-            - This function takes an image and uses ResNet-10 Architecture as the backbone
-            - This function uses Floating point 16 version of the original caffe implementation \n
-        Parameters:
-        - image (array of the read image): The image read from the either local or online source. \n
-
-        Returns:
-        - np.array: The processed image.
-        """
-        try:
-            modeFile = "models/models/res10_300x300_ssd_iter_140000_fp16.caffemodel"
-            configFile = "models/models/deploy.prototxt"
-            net = cv.dnn.readNetFromCaffe(modeFile, configFile)
-            if net is None:
-                raise Exception("Error loading network")
-            blob = cv.dnn.blobFromImage(image=image, scalefactor=1.0, size=(
-                300, 300), mean=(104.0, 177.0, 123.0), swapRB=False, crop=False)
-            net.setInput(blob)
-            detections = net.forward()
-            bbox = []
-            for i in range(detections.shape[2]):
-                confidence = detections[0, 0, i, 2]
-                if confidence > conf_threshold:
-                    x1 = int(detections[0, 0, i, 3] * image.shape[1])
-                    y1 = int(detections[0, 0, i, 4] * image.shape[0])
-                    x2 = int(detections[0, 0, i, 5] * image.shape[1])
-                    y2 = int(detections[0, 0, i, 6] * image.shape[0])
-                    face = image[y1:y2, x1:x2]
-                    bbox.append(face)
-            return bbox
-        except Exception as e:
-            raise e
 
     def _load_local_dataset(self, path, target_size=(224, 224), batch_size=32):
         """
@@ -83,32 +47,7 @@ class ImagePersonClassifier:
         except Exception as e:
             raise e
 
-    def _load_from_dataset(self, dataset, target_size=(224, 224), batch_size=32):
-        """
-        This function loads images from a dataset like (mainfolder->foldername,foldername):
-        - This functions loads the image and appends it to the images array which is later converted to numpy array
-        - The function aswell saves the labels of the folder per images and also creates numerical labels \n
-
-        Parameters:
-        - url -> url of the dataset
-        - target_size -> tuple for the size of the image to be reshaped to default is (224,224)
-        - batch_size -> batch size for the dataset \n
-
-        Returns:
-        - np.array: The processed images,labels,numericallabels.
-        """
-        try:
-            train_dataset = keras.utils.image_dataset_from_directory(
-                dataset, image_size=target_size, batch_size=batch_size
-            )
-            val_dataset = keras.utils.image_dataset_from_directory(
-                dataset, image_size=target_size, batch_size=batch_size
-            )
-            return train_dataset, val_dataset
-        except Exception as e:
-            raise e
-
-    def _create_model_v1(self, num_classes, input_shape=(224, 224), activation="relu"):
+    def _create_model_v1(self, num_classes, input_shape=(224, 224,3), activation="relu"):
         """
         This function creates a model using keras sequential model \n
         Parameters:
@@ -169,9 +108,10 @@ class ImagePersonClassifier:
         - model -> The trained model history
         """
         try:
+            modal_path = os.path.join(os.getcwd(), "models", "models", f"{model_save_path}.keras")
             history = model.fit(
                 train_dataset, validation_data=val_dataset, epochs=epochs)
-            model.save(f"{model_save_path}.keras")
+            model.save(modal_path)
             return history
         except Exception as e:
             raise e
@@ -198,8 +138,31 @@ class ImagePersonClassifier:
             return evaluation_dict
         except Exception as e:
             raise e
+        
+    def _display_evaluation(self,history):
+        try:
+           # accuracy
+            eval_dict = self._evaluate_model(history)
+            train_accuracy = eval_dict["train_evaluation"][0]
+            test_accuracy =  eval_dict["test_evaluation"][0]
 
-    def _create_model_v2(self, num_classes, input_shape=(224, 224), activation="sigmoid"):
+            # loss
+            loss = eval_dict["train_evaluation"][1]
+            val_loss = eval_dict["test_evaluation"][1]
+
+            print(f"Test Accuracy: {test_accuracy[-1] * 100:.2f}%")
+            print(f"Loss: {val_loss[-1]}")
+
+            print(f"Train Accuracy: {train_accuracy[-1] * 100:.2f}%")
+            print(f"Loss: {loss[-1]}")
+            return {
+                "Test": [f"Test Accuracy: {test_accuracy[-1] * 100:.2f}%", f"Loss: {val_loss[-1]}"],
+                "Train": [f"Train Accuracy: {train_accuracy[-1] * 100:.2f}%", f"Loss: {loss[-1]}"]
+            }
+        except Exception as e:
+            raise e
+
+    def _create_model_v2(self, num_classes, input_shape=(224, 224,3), activation="sigmoid"):
         """
         This function creates a model using keras sequential model with some regularization \n
         Parameters:
@@ -238,7 +201,7 @@ class ImagePersonClassifier:
         except Exception as e:
             raise e
 
-    def _predict_with_image(self, image, model_name, input_shape=(224, 224, 3)):
+    def _predict_with_image_kr(self, image, model_name, input_shape=(224, 224, 3)):
         try:
             # check if the image is of the right shape
             if image.shape != input_shape:
@@ -259,22 +222,31 @@ class ImagePersonClassifier:
         try:
             predicted_class_index = np.argmax(predictions)
             top_4_indices = np.argsort(predictions[0])[::-1][:4]
+            
+            # Remove the predicted_class_index from top_4_indices
+            top_4_indices = top_4_indices[top_4_indices != predicted_class_index]
+            
             top_4_confidences = predictions[0, top_4_indices]
             confidence = predictions[0, predicted_class_index]
             confidence_percentages = (np.exp(top_4_confidences) /
-                                      np.sum(np.exp(top_4_confidences))) * 100
+                                    np.sum(np.exp(top_4_confidences))) * 100
+            
+            # Calculate percentage of predicted_class_index
+            predicted_class_percentage = (np.exp(confidence) / np.sum(np.exp(top_4_confidences))) * 100
+            
             predict_dict = {
                 "predicted_class_index": predicted_class_index,
                 "top_4_indices": top_4_indices,
                 "top_4_confidences": top_4_confidences,
                 "predictclass_confidence": confidence,
-                "confidence_percentages": confidence_percentages
+                "confidence_percentages": confidence_percentages,
+                "predicted_class_percentage": predicted_class_percentage
             }
             return predict_dict
         except Exception as e:
             raise e
 
-    def _show_predicted_people(self, predict_dict, class_labels):
+    def _show_predicted_people_kr(self, predict_dict, class_labels):
         try:
             predicted = []
             # check if predict_dict contains the required keys
@@ -287,6 +259,17 @@ class ImagePersonClassifier:
                 predicted.append(
                     {"rank": i+1, "label": label, "confidence": confidence}
                 )
+            return predicted
+        except Exception as e:
+            raise e
+    
+    def _show_predicted_class(self, predictions, class_labels):
+        try:
+            predict = self._predicted_class(predictions)
+            predicted_class = predict['predicted_class_index']
+            predicted_confidence = predict['predictclass_confidence']
+            predicted_percentage = predict['predicted_class_percentage']
+            predicted = {"label": class_labels[predicted_class], "confidence": predicted_confidence, "percentage": predicted_percentage}
             return predicted
         except Exception as e:
             raise e

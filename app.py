@@ -6,10 +6,28 @@ import os
 # from conn.config import config
 from utils.imageloader import ImageLoader
 # from utils.personaudio import PersonAudio
+from utils.newclassifier import ImagePersonClassifier
+from keras.preprocessing.image import ImageDataGenerator
 
 load_dotenv()
 
-# obj = PersonAudio(label_path="personsaudiolabels", model_path="personsaudiomodel")
+loaderimage = ImageLoader()
+# downloaded = loaderimage._get_read_images("persons")
+# print(downloaded)
+# loaderimage._remove_cloud_folder("persons")
+
+classifier = ImagePersonClassifier()
+# train_ds, test_ds = classifier._load_local_dataset(r"D:\user\sockets_web\person")
+# classes = train_ds.class_names
+# num_classes = len(classes)
+# model = classifier._create_model_v1(num_classes)
+# model = classifier._compile_model(model=model)
+# history = classifier._train_model(model, train_ds, test_ds, "models/models/personclassifierkeras")
+# evaluation = classifier._evaluate_model(history)
+# eval_display = classifier._display_evaluation(history)
+# print(eval_display)
+# obj = PersonAudio(label_path="personsaudiolabels",
+#                   model_path="personsaudiomodel")
 # pathurl = r"C:\Users\Rogers\Downloads\WhatsApp Unknown 2024-01-05 at 11.48.12 AM\test.ogg"
 # results = obj._predict_person_audio(pathurl)
 # print(results)
@@ -28,22 +46,25 @@ jwt = JWTManager(app)
 # @app.before_request
 # def before_request():
 
+
 @app.errorhandler(404)
 def not_found_error(error):
     errordata = {"error": "Page not found"}
     return jsonify(errordata), 404
 
+
 @app.route('/')
 def index():
     image_loader = ImageLoader()
     folder_path = "persons"
-    
+
     try:
         images = image_loader.OrganizePersonImages(folder_path)
         print(images)
         return jsonify(images)
     except Exception as e:
         return jsonify({"error": str(e)})
+
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -24,16 +24,19 @@ class Connection:
             return self.connection
         except mysql.Error as err:
             raise err
-    def executeQuery(self,query):
+    def executeQuery(self,query, values=None):
         try:
-           if self.connection is None:
+            if self.connection is None:
                self.connect()
-           if not self.connection.is_connected():
+            if not self.connection.is_connected():
                raise mysql.Error("Connection not established")
             
-           cursor = self.connection.cursor(dictionary=True)
-           cursor.execute(query)
-           return cursor
+            cursor = self.connection.cursor(dictionary=True)
+            if values:
+               cursor.execute(query, values)
+            else:
+               cursor.execute(query)
+            return cursor
         except mysql.Error as err:
             raise err
     
@@ -42,6 +45,24 @@ class Connection:
             query = "SELECT *FROM {}".format(table)
             cursor = self.executeQuery(query)
             results = cursor.fetchall()
+            return results
+        except mysql.Error as err:
+            raise err
+    
+    def findone(self, table, conditions=None):
+        try:
+            query = "SELECT *FROM {}".format(table)
+            if conditions is None:
+                raise mysql.Error("No conditions provided")
+            # check if conditions is not a dictionary
+            if not isinstance(conditions, dict):
+                raise mysql.Error("conditions must be a dictionary")
+            values = None
+            query += " WHERE " + " AND ".join([f"{key}=%s" for key in conditions])
+            values = tuple(conditions.values())
+            print(query)
+            cursor = self.executeQuery(query, values)
+            results = cursor.fetchone()
             return results
         except mysql.Error as err:
             raise err

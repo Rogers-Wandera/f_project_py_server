@@ -5,10 +5,11 @@ import numpy as np
 from utils.imageloader import ImageLoader
 import json
 from conn.connector import Connection
+from utils.newclassifier import ImagePersonClassifier
 
 dbconnect = Connection()
 
-
+kclassifier = ImagePersonClassifier()
 class PersonClassifier(ImageLoader):
     """A class for training and using a facial recognition model."""
 
@@ -17,11 +18,13 @@ class PersonClassifier(ImageLoader):
 
     def faceDetection(self, img):
         try:
-            face_classifier = cv2.CascadeClassifier(
-                cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
-            face = face_classifier.detectMultiScale(
-                img, scaleFactor=1.1, minNeighbors=4)
-            return face
+            # face_classifier = cv2.CascadeClassifier(
+            #     cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            # face = face_classifier.detectMultiScale(
+            #     img, scaleFactor=1.1, minNeighbors=4)
+            # return face
+            faces = self._face_detection(img)
+            return faces
         except Exception as e:
             print(f"Error loading cascade classifier: {e}")
             raise e
@@ -40,7 +43,7 @@ class PersonClassifier(ImageLoader):
         response = requests.get(url)
         img_array = np.array(bytearray(response.content), dtype=np.uint8)
         img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
         img = cv2.fastNlMeansDenoising(
             img, None, h=10, templateWindowSize=5, searchWindowSize=21)
         img = cv2.resize(img, target_size)
@@ -64,13 +67,12 @@ class PersonClassifier(ImageLoader):
                 image_path = file['secure_url']
                 img = self.read_image_from_url(image_path)
                 if img is not None:
-                    faces = self.faceDetection(img)
+                    faces = kclassifier._face_detection(img)
                     if len(faces) == 0:
                         continue
-                    x, y, w, h = faces[0]
-                    img = img[y:y+h, x:x+w]
-                    images.append(img)
-                    labels.append(file['label'])
+                    for face in faces:
+                        images.append(face)
+                        labels.append(file['label'])
         return images, labels
 
     def create_recognizer(self, images, labels):
@@ -135,26 +137,26 @@ class PersonClassifier(ImageLoader):
         try:
             recognizer = self.load_recognizer()
             image = self.read_image_from_url(image_url)
-            faces = self.faceDetection(image)
+            faces = kclassifier._face_detection(image)
             # Check if a face is detected
             if len(faces) == 0:
                 print("No face detected.")
-                return None, None
+                return []
+            
+            predicted = []
 
-            # Extract the first detected face (assuming there's only one)
-            x, y, w, h = faces[0]
-            face_roi = image[y:y+h, x:x+w]
-            label, confidence = recognizer.predict(face_roi)
+            for face in faces:
+                label, confidence = recognizer.predict(face)
 
-            # get label mappings
-            label_mapping = self.load_label_mapping()
-            if label_mapping is None:
-                return None, None
+                # get label mappings
+                label_mapping = self.load_label_mapping()
+                if label_mapping is None:
+                    return []
 
-            for labelx in label_mapping:
-                if label_mapping[labelx] == label:
-                    label = labelx
-            return label, confidence
+                for labelx in label_mapping:
+                    if label_mapping[labelx] == label:
+                        predicted.append({"label": labelx, "confidence": confidence})
+            return predicted
         except Exception as e:
             print(f"Error predicting: {e}")
             raise e
@@ -162,12 +164,19 @@ class PersonClassifier(ImageLoader):
     def predictWithImage(self, image, confidence_threshold=40):
         try:
             recognizer = self.load_recognizer()
-            label, confidence = recognizer.predict(image)
-            if confidence < confidence_threshold:
-                # Recognition failed
-                return None, None
-            else:
-                return label, confidence
+            # label, confidence = recognizer.predict(image)
+            faces = kclassifier._face_detection(image)
+            predicted = []
+            if len(faces) == 0:
+                predicted = []
+            for face in faces:
+                label, confidence = recognizer.predict(face)
+                if confidence < confidence_threshold:
+                    # Recognition failed
+                    predicted = []
+                else:
+                    predicted.append({"label": label, "confidence": confidence})
+            return predicted
         except Exception as e:
             print(f"Error predicting: {e}")
             raise e
@@ -177,13 +186,12 @@ class PersonClassifier(ImageLoader):
             img = cv2.fastNlMeansDenoising(
                 gray_img, None, h=10, templateWindowSize=5, searchWindowSize=21)
             img = cv2.resize(img, target_size)
-            faces = self.faceDetection(img)
+            faces = kclassifier._face_detection(img)
             if len(faces) == 0:
                 raise Exception("No face detected")
             newfaces = []
-            for (x, y, w, h) in faces:
-                face_roi = img[y:y+h, x:x+w]
-                newfaces.append(face_roi)
+            for face in faces:
+                newfaces.append(face)
             return newfaces
         except Exception as e:
             raise e
@@ -220,9 +228,9 @@ class PersonClassifier(ImageLoader):
 
     def detect_bounding_box(self, vid):
         gray_image = cv2.cvtColor(vid, cv2.COLOR_BGR2GRAY)
-        faces = self.faceDetection(gray_image)
-        for (x, y, w, h) in faces:
-            cv2.rectangle(vid, (x, y), (x+w, y+h), (0, 255, 0), 4)
+        faces = kclassifier._face_detection(gray_image)
+        for face in faces:
+            cv2.rectangle(vid, (face[0], face[1]), (face[0] + face[2], face[1] + face[3]), (0, 255, 0), 4)
         return faces
 
     def create_real_time_detection(self, video_url=0):
@@ -237,8 +245,8 @@ class PersonClassifier(ImageLoader):
 
                 # call the detect_bounding_box function
                 faces = self.detect_bounding_box(video_frame)
-                for (x, y, w, h) in faces:
-                    face_roi = video_frame[y:y+h, x:x+w]
+                for face in faces:
+                    face_roi = video_frame[face[1]: face[1] + face[3], face[0]: face[0] + face[2]]
                     face_roi = cv2.fastNlMeansDenoising(
                         face_roi, None, h=10, templateWindowSize=5, searchWindowSize=21)
                     # face_roi = cv2.GaussianBlur(face_roi, (5, 5), 0)
@@ -259,7 +267,7 @@ class PersonClassifier(ImageLoader):
                     # first and last latter of the name
                     prefix = "Unknown" if user is None else nameprefix
                     text = f"{prefix}: {confidence:.2f}"
-                    cv2.putText(video_frame, text, (x, y-10),
+                    cv2.putText(video_frame, text, (face[0], face[1] - 10),
                                 cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
                 cv2.imshow("Video Frame", video_frame)
