@@ -2,7 +2,7 @@ import cv2
 from utils.lbhclassifier import PersonLBHClassifier
 import json
 from conn.connector import Connection
-from utils.newclassifier import ImagePersonClassifier
+from utils.kerasclassifier import ImagePersonClassifier
 import os
 from keras.losses import SparseCategoricalCrossentropy
 
@@ -95,7 +95,13 @@ class PersonImageClassifier(PersonLBHClassifier, ImagePersonClassifier):
             kr_labels = self._get_kr_labels()
             lr_predicted_class = self._show_predicted_class(krprediction, kr_labels)
             krpredictions = self._show_predicted_people_kr(krpredict, kr_labels)
-            return {"lbhprediction": lbhpredictions}
+            return {"lbhprediction": lbhpredictions, "predictions": {"predicted_class": lr_predicted_class, "predicted_people": krpredictions}}
         except Exception as e:
             print(f"Error showing predicted people: {e}")
+            raise e
+    
+    def _realtime_detect(self, video_url=0):
+        try:
+            return self._realtime_detection(modalname=self.lbhmodel, video_url=video_url)
+        except Exception as e:
             raise e

@@ -5,7 +5,9 @@ import cv2 as cv
 import os
 import pathlib as pl
 import keras
+from conn.connector import Connection
 
+dbconnect = Connection()
 
 class ImagePersonClassifier:
     """
@@ -256,9 +258,10 @@ class ImagePersonClassifier:
             # get the top 4 indices and confidences
             for i, (index, confidence) in enumerate(zip(predict_dict["top_4_indices"], predict_dict["confidence_percentages"]), 1):
                 label = class_labels[index]
-                predicted.append(
-                    {"rank": i+1, "label": label, "confidence": confidence}
-                )
+                user = dbconnect.findone("person", {"id": label, "isActive": 1})
+                if user != None:
+                    user_name = f"{user['firstName']} {user['lastName']}"
+                    predicted.append({"rank": i+1, "label": user_name, "confidence": int(round(confidence))})
             return predicted
         except Exception as e:
             raise e
@@ -267,9 +270,14 @@ class ImagePersonClassifier:
         try:
             predict = self._predicted_class(predictions)
             predicted_class = predict['predicted_class_index']
-            predicted_confidence = predict['predictclass_confidence']
-            predicted_percentage = predict['predicted_class_percentage']
-            predicted = {"label": class_labels[predicted_class], "confidence": predicted_confidence, "percentage": predicted_percentage}
+            # predicted_confidence = predict['predictclass_confidence']
+            predicted_percentage = int(round(predict['predicted_class_percentage']))
+            label = class_labels[predicted_class]
+            user = dbconnect.findone("person", {"id": label, "isActive": 1})
+            predicted = {}
+            if user != None:
+                user_name = f"{user['firstName']} {user['lastName']}"
+                predicted = {"label": user_name, "confidence": predicted_percentage}
             return predicted
         except Exception as e:
             raise e

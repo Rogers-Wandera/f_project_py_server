@@ -5,7 +5,7 @@ import numpy as np
 from utils.imageloader import ImageLoader
 import json
 from conn.connector import Connection
-from utils.newclassifier import ImagePersonClassifier
+from utils.kerasclassifier import ImagePersonClassifier
 
 dbconnect = Connection()
 

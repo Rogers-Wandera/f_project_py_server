@@ -53,6 +53,40 @@ class ImageLoader:
         except Exception as e:
             raise e
     
+    def _bounding_boxes(self, image, conf_threshold=0.8):
+        """
+        This function is for face detection using OpenCv DNN
+            - This function takes an image and uses ResNet-10 Architecture as the backbone
+            - This function uses Floating point 16 version of the original caffe implementation \n
+        Parameters:
+        - image (array of the read image): The image read from the either local or online source. \n
+
+        Returns:
+        - np.array: The processed image.
+        """
+        try:
+            modeFile = os.path.join(os.getcwd(), "models", "models", "cafe.caffemodel")
+            configFile = os.path.join(os.getcwd(), "models", "models", "deploy.prototxt")
+            net = cv.dnn.readNetFromCaffe(configFile, modeFile)
+            if net is None:
+                raise Exception("Error loading network")
+            blob = cv.dnn.blobFromImage(image=image, scalefactor=1.0, size=(
+                300, 300), mean=(104.0, 177.0, 123.0), swapRB=False, crop=False)
+            net.setInput(blob)
+            detections = net.forward()
+            bbox = []
+            for i in range(detections.shape[2]):
+                confidence = detections[0, 0, i, 2]
+                if confidence > conf_threshold:
+                    x1 = int(detections[0, 0, i, 3] * image.shape[1])
+                    y1 = int(detections[0, 0, i, 4] * image.shape[0])
+                    x2 = int(detections[0, 0, i, 5] * image.shape[1])
+                    y2 = int(detections[0, 0, i, 6] * image.shape[0])
+                    bbox.append((x1, y1, x2, y2))
+            return bbox
+        except Exception as e:
+            raise e
+    
     def GetImageFolders(self, folder_path, type='upload', max_results=500):
        try:
         results = cloudinary.api.resources(type=type, prefix=folder_path, max_results=max_results)

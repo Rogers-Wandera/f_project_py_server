@@ -6,7 +6,7 @@ import os
 # from conn.config import config
 from utils.imageloader import ImageLoader
 # from utils.personaudio import PersonAudio
-from utils.newclassifier import ImagePersonClassifier
+from utils.kerasclassifier import ImagePersonClassifier
 from keras.preprocessing.image import ImageDataGenerator
 
 load_dotenv()

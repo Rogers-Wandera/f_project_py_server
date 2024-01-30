@@ -121,7 +121,7 @@ class PersonLBHClassifier(ImageLoader):
                 face = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
                 face = cv2.resize(face, target_size)
                 label, confidence = recognizer.predict(face)
-                prediction.append({"label": label, "confidence": confidence})
+                prediction.append({"label": label, "confidence": int(round(confidence))})
             return prediction
         except Exception as e:
             print(f"Error predicting: {e}")
@@ -145,5 +145,51 @@ class PersonLBHClassifier(ImageLoader):
                             user_name = f"{user['firstName']} {user['lastName']}"
                             predicted.append({"label": labelx, "confidence": confidence,"person":user_name})
             return predicted
+        except Exception as e:
+            raise e
+    def detect_bounding_box(self, vid):
+        faces = self._bounding_boxes(vid)
+        for face in faces:
+            x1, y1, x2, y2 = face
+            cv2.rectangle(vid, (x1, y1), (x2, y2), (0, 255, 0), 4)
+        return faces
+    
+    def _realtime_detection(self, modalname, video_url=0):
+        try:
+            video_capture = cv2.VideoCapture(video_url)
+            video_stream = True
+            label_mapping = self.load_label_mapping(modalname)
+            recognizer = self._load_recognizer(modalname)
+            while video_stream:
+                results, video_frame = video_capture.read()
+                if results is False:
+                    break
+                faces = self.detect_bounding_box(video_frame)
+                for face in faces:
+                    face_roi = video_frame[face[1]: face[1] + face[3], face[0]: face[0] + face[2]]
+                    gray_image = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+                    label, confidence = recognizer.predict(gray_image)
+                    user = None
+                    nameprefix = None
+                    for labelx in label_mapping:
+                        if label_mapping[labelx] == label:
+                            userdata = dbconnect.findone("person", {"id": labelx, "isActive": 1})
+                            if userdata is not None:
+                                user = f"{userdata['firstName']} {userdata['lastName']}"
+                                nameprefix = f"{userdata['firstName'][0]}.{userdata['lastName'][0]}"
+                            label = labelx
+                    prefix = "Unknown" if user is None else nameprefix
+                    text = f"{prefix}: {confidence:.2f}"
+                    cv2.putText(video_frame, text, (face[0], face[1] - 10),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                    cv2.imshow("Video Frame", video_frame)
+                    key = cv2.waitKey(1)
+                    if key in [ord('q'), 27, 255]:
+                        video_stream = False
+            video_capture.release()
+            cv2.destroyAllWindows()
+
+            if not video_stream:
+                print("Video stream ended.")
         except Exception as e:
             raise e
