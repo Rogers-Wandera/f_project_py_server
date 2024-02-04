@@ -1,8 +1,11 @@
 from utils.main import MainAudioClassifier
 import os
 from keras.callbacks import ReduceLROnPlateau
+from conn.connector import Connection
 import numpy as np
+import math
 
+connect = Connection()
 class PersonAudio(MainAudioClassifier):
     def __init__(self, label_path, model_path):
         super().__init__()
@@ -119,9 +122,75 @@ class PersonAudio(MainAudioClassifier):
                     predicted_label = label
                     break
 
-            percentage_confidence = round(confidence * 100, 1)
+            percentage_confidence = math.floor(confidence * 100)
             return predictions, predicted_class_index, predicted_label, confidence, percentage_confidence
 
+        except Exception as e:
+            raise e
+        
+    def _show_predicted_person(self, path,confidence_threshold=0.7):
+        try:
+            predictions, predicted_class_index, predicted_label, confidence, percentage_confidence = self._predict_person_audio(path, confidence_threshold)
+            predicted = self._predicted_class(predictions)
+            top_indices = predicted['top_4_indices']
+            top_labels = predicted['top_4_indices_labels']
+            print(top_labels)
+            predictedPerson = {}
+            otherpredictions = []
+            if predicted_label != "unknown":
+               user = connect.findone("person", {"id": predicted_label, "isActive": 1})
+               if user != None:
+                   user_name = f"{user['firstName']} {user['lastName']}"
+                   predictedPerson = {"label": user_name, "confidence": percentage_confidence}
+            
+            if len(top_indices) > 0:
+               for label, con, perc in top_labels:
+                   if label != predicted_label:
+                       user = connect.findone("person", {"id": label, "isActive": 1})
+                       if user != None:
+                           user_name = f"{user['firstName']} {user['lastName']}"
+                        #    percentg_conf = round(confidence * 100, 1)
+                           otherpredictions.append({"label": user_name, "confidence": perc})
+            return predictedPerson,otherpredictions
+        except Exception as e:
+            raise e
+    
+    def _predicted_class(self, predictions):
+        try:
+            predicted_class_index = np.argmax(predictions)
+            top_4_indices = np.argsort(predictions[0])[::-1][:4]
+            
+            # Remove the predicted_class_index from top_4_indices
+            top_4_indices = top_4_indices[top_4_indices != predicted_class_index]
+            
+            top_4_confidences = predictions[0, top_4_indices]
+            confidence = predictions[0, predicted_class_index]
+            confidence_percentages = (np.exp(top_4_confidences) /
+                                    np.sum(np.exp(top_4_confidences))) * 100
+            
+            # Calculate percentage of predicted_class_index
+            predicted_class_percentage = math.floor(confidence * 100)
+            label_mappings = self._load_label_mappings(self.label_path)
+
+            top_4_indices_labels = []
+            for index in top_4_indices:
+                for label in label_mappings:
+                    if label_mappings[label] == index:
+                        other_confidence = predictions[0, index]
+                        confidence_percentage = math.floor((np.exp(other_confidence) / np.sum(np.exp(top_4_confidences))) * 100)
+                        top_4_indices_labels.append((label, other_confidence,confidence_percentage))
+                        break
+            
+            predict_dict = {
+                "predicted_class_index": predicted_class_index,
+                "top_4_indices": top_4_indices,
+                "top_4_confidences": top_4_confidences,
+                "predictclass_confidence": confidence,
+                "confidence_percentages": confidence_percentages,
+                "predicted_class_percentage": predicted_class_percentage,
+                "top_4_indices_labels": top_4_indices_labels
+            }
+            return predict_dict
         except Exception as e:
             raise e
 
