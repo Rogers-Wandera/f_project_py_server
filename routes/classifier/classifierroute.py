@@ -1,15 +1,15 @@
 from flask import Blueprint
-from controllers.classifier.classifiercontroller import PredictWithLocalImage, TrainClassifier, RealTimeDetection,PredictWithImageUrl
+from controllers.classifier.classifiercontroller import TrainClassifier, RealTimeDetection,PredictPerson
 from middlewares.VerifyJwt import verifyjwt
 from middlewares.VerifyRoles import verifyroles
 from conn.rolelist import USER_ROLES
 classifier_bp = Blueprint("main", __name__)
 
-@classifier_bp.route("/local", methods=["POST"])
+@classifier_bp.route("/predict", methods=["POST"])
 @verifyjwt
 @verifyroles(USER_ROLES['Admin'])
 def PredictWithImage():
-    return PredictWithLocalImage()
+    return PredictPerson()
 
 @classifier_bp.route("/train", methods=["POST"])
 @verifyjwt
@@ -22,9 +22,3 @@ def TrainModel():
 @verifyroles(USER_ROLES['Admin'])
 def GetRealTimeDetection():
     return RealTimeDetection()
-
-@classifier_bp.route("/url", methods=["POST"])
-@verifyjwt
-@verifyroles(USER_ROLES['Admin'])
-def PredictImageWithUrl():
-    return PredictWithImageUrl()

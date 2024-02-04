@@ -1,4 +1,4 @@
 .venv
 .env
-/logs
-/models
+logs
+models
