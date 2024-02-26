@@ -2,6 +2,8 @@ from utils.classifier import PersonClassifier
 from flask import request, jsonify
 import os
 from utils.newcombined import PersonImageClassifier
+from schema.schema import train_schema
+from jsonschema import validate,ValidationError
 
 ClassifierObj = PersonClassifier()
 new_classifier = PersonImageClassifier("lhb_person_model", "kr_person_model", input_shape=(224,224, 3), target_size=(224, 224))
@@ -83,22 +85,33 @@ def PredictPerson():
 
 
 def TrainClassifier():
-   try:
-        downloaded = new_classifier._get_read_images("persons")
+    try:
+        validate(schema=train_schema, instance=request.json)
+        version = request.json['version']
+        activation = request.json['activation']
+        downloaded = 0
+        if request.json['download'] == 1:
+            downloaded = new_classifier._get_read_images("persons")
         train_ds, val_ds = new_classifier._load_local_dataset("persons", target_size=(224, 224), batch_size=32)
         classes = train_ds.class_names
         num_classes = len(classes)
         new_classifier._save_kr_labels(classes)
         lbh_model = new_classifier._train_lbh_model("persons")
-        history = new_classifier._train_kr_model(num_classes, train_ds, val_ds, show_summary=True, epochs=10)
+        history = new_classifier._train_kr_model(num_classes, train_ds, val_ds, show_summary=True, epochs=10,
+                version=version, activation=activation)
         eval_dict = new_classifier._display_evaluation(history)
-        removed = new_classifier._remove_cloud_folder("persons")
+        removed = False
+        if request.json['remove'] == 1:
+            new_classifier._remove_cloud_folder("persons")
+            removed = True
         return jsonify({"msg":"Models Trained Successfully",
                         "kr_evaluation": eval_dict, 
                         "downloaded":downloaded, 
                         "removed": removed, "lbh_model": lbh_model[1]}), 200
-   except Exception as e:
-    return jsonify({"error": str(e)}), 400
+    except ValidationError as ve:
+        return jsonify({"error":ve.message}), 400
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
 
 def RealTimeDetection():
     try:

@@ -6,6 +6,7 @@ import os
 import pathlib as pl
 import keras
 from conn.connector import Connection
+from keras.preprocessing.image import ImageDataGenerator
 
 dbconnect = Connection()
 
@@ -117,6 +118,32 @@ class ImagePersonClassifier:
             return history
         except Exception as e:
             raise e
+    
+    def _dat_aug_model(self, model, train_dataset, val_dataset, model_save_path, epochs=10):
+        """
+        This function creates a model using keras functional API \n
+        Parameters:
+        - num_classes -> number of classes in the dataset.
+        - input_shape -> tuple containing the shape of the input image \n
+        Returns:
+        - keras.Model: The created model
+        """
+        try:
+            datagen = ImageDataGenerator(
+                rotation_range=20,
+                width_shift_range=0.2,
+                height_shift_range=0.2,
+                horizontal_flip=True)
+            datagen.fit(train_dataset)
+            modal_path = os.path.join(os.getcwd(), "models", "models", f"{model_save_path}.keras")
+            history = model.fit(datagen.flow(train_dataset, batch_size=32),
+                            validation_data=val_dataset, 
+                            steps_per_epoch=len(train_dataset) / 32, 
+                            epochs=epochs)
+            model.save(modal_path)
+            return history
+        except Exception as e:
+            raise e
 
     def _evaluate_model(self, history):
         """
@@ -177,18 +204,48 @@ class ImagePersonClassifier:
         try:
             model = Sequential([
                 layers.Rescaling(1./255, input_shape=input_shape),
-                layers.Conv2D(16, 3, kernel_regularizer=keras.regularizers.l2(
-                    0.0001), padding="same", activation="relu"),
+                layers.Conv2D(16, 3, kernel_regularizer=keras.regularizers.l2(0.0001), padding="same", activation=activation),
                 layers.MaxPool2D(),
-                layers.Conv2D(32, 3, padding="same", activation="relu"),
+                layers.Conv2D(32, 3, padding="same", activation=activation),
                 layers.MaxPool2D(),
-                layers.Conv2D(64, 3, padding="same", activation="relu"),
+                layers.Conv2D(64, 3, padding="same", activation=activation),
+                layers.MaxPool2D(),
+                layers.Conv2D(128, 3, padding="same", activation=activation),
                 layers.MaxPool2D(),
                 layers.Flatten(),
-                layers.Dense(128, kernel_regularizer=keras.regularizers.l2(
-                    0.0001), activation=activation),
+                layers.Dense(256, kernel_regularizer=keras.regularizers.l2(0.0001), activation=activation),
                 layers.Dropout(0.5),
-                layers.Dense(num_classes)
+                layers.Dense(num_classes, activation='softmax')
+            ])
+            return model
+        except Exception as e:
+            raise e
+    
+    def _create_model_v3(self, num_classes, input_shape=(224, 224,3), activation="relu"):
+        """
+        This function creates a model using keras sequential model with some regularization \n
+        Parameters:
+        - num_classes -> number of classes in the dataset.
+        - input_shape -> tuple containing the shape of the input image \n
+
+        Returns:
+        - keras.Sequential: The created model
+        """
+        try:
+            model = Sequential([
+                layers.Rescaling(1./255, input_shape=input_shape),
+                layers.Conv2D(16, 3, kernel_regularizer=keras.regularizers.l2(0.0001), padding="same", activation=activation),
+                layers.MaxPool2D(),
+                layers.Conv2D(32, 3, padding="same", activation=activation),
+                layers.MaxPool2D(),
+                layers.Conv2D(64, 3, padding="same", activation=activation),
+                layers.MaxPool2D(),
+                layers.Conv2D(128, 3, padding="same", activation=activation),
+                layers.MaxPool2D(),
+                layers.Flatten(),
+                layers.Dense(256, kernel_regularizer=keras.regularizers.l2(0.0001), activation=activation),
+                layers.Dropout(0.7),
+                layers.Dense(num_classes, activation='softmax')
             ])
             return model
         except Exception as e:

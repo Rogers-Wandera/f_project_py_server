@@ -18,7 +18,6 @@ def PredictAudio():
     try:
         validate(schema=audio_schema, instance=request.json)
         prediction = audio._show_predicted_person(request.json['audio']['path'])
-        print(prediction)
         return jsonify({"predict": prediction}), 200
     except ValidationError as ve:
         return jsonify({"error":ve.message}), 400

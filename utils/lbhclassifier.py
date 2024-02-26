@@ -62,8 +62,8 @@ class PersonLBHClassifier(ImageLoader):
                             face = cv2.fastNlMeansDenoising(
                             face, None, h=10, templateWindowSize=5, searchWindowSize=21)
                             face = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
-                            cv2.imshow("image", face)
-                            cv2.waitKey(0)
+                            # cv2.imshow("image", face)
+                            # cv2.waitKey(0)
                             images.append(face)
                             labels.append(folder)
             return images, labels
