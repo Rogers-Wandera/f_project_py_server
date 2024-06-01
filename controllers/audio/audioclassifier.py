@@ -1,7 +1,6 @@
 from flask import request, jsonify
 from schema.schema import audio_schema
 from jsonschema import validate,ValidationError
-import os
 from utils.personaudio import PersonAudio
 
 audio = PersonAudio(label_path="personsaudiolabels",
@@ -9,8 +8,11 @@ audio = PersonAudio(label_path="personsaudiolabels",
 
 def TrainAudioClassifier():
     try:
-        audio._train_person_audio_model("personsaudio", type="cloudinary")
-        return jsonify({"msg": "Audio model trained successfully"}), 200
+        results = audio._train_person_audio_model("personsaudio", type="cloudinary")
+        evaluation = audio._display_evaluation(history=results)
+        return jsonify({"msg": "Audio model trained successfully", 
+                        "evaluation": evaluation, 
+                        "itemsCount": audio.trainedItemsCount,"modelName": "personsaudiomodel"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 

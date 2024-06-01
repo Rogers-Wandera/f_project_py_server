@@ -79,6 +79,8 @@ class MainAudioClassifier(ImageLoader):
             x = []
             y = []
             results = self.OrganizePersonAudios(folder_path=path, max_results=max_results)
+            if results is None:
+                raise Exception("No Audio files found")
             for i, folder in enumerate(results):
                 self.labels.append(folder)
                 for file in results[folder]:

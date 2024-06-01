@@ -1,4 +1,4 @@
-from flask import jsonify, g
+from flask import jsonify
 from routes.approute import CreateApp
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
@@ -12,7 +12,6 @@ app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_SECRET_KEY'] = JWT_SECRET
 
 jwt = JWTManager(app)
-
 @app.errorhandler(404)
 def not_found_error(error):
     errordata = {"error": "Page not found"}

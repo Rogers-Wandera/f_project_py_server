@@ -96,18 +96,15 @@ def TrainClassifier():
         classes = train_ds.class_names
         num_classes = len(classes)
         new_classifier._save_kr_labels(classes)
-        lbh_model = new_classifier._train_lbh_model("persons")
+        new_classifier._train_lbh_model("persons")
         history = new_classifier._train_kr_model(num_classes, train_ds, val_ds, show_summary=True, epochs=10,
                 version=version, activation=activation)
         eval_dict = new_classifier._display_evaluation(history)
-        removed = False
         if request.json['remove'] == 1:
             new_classifier._remove_cloud_folder("persons")
-            removed = True
         return jsonify({"msg":"Models Trained Successfully",
-                        "kr_evaluation": eval_dict, 
-                        "downloaded":downloaded, 
-                        "removed": removed, "lbh_model": lbh_model[1]}), 200
+                        "evaluation": eval_dict, 
+                        "itemsCount":downloaded, "modelName": new_classifier.krmodel}), 200
     except ValidationError as ve:
         return jsonify({"error":ve.message}), 400
     except Exception as e:
@@ -119,3 +116,14 @@ def RealTimeDetection():
         return jsonify({"msg": "Realtime detection ended successfully"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 400
+
+def CheckVariants():
+    try:
+        download = 1
+        remove = 1
+        save_folder_path = os.path.join(os.getcwd(), "persons")
+        if os.path.exists(save_folder_path):
+           download = 0
+        return jsonify({"download": download, "remove": remove})
+    except Exception as e:
+        return jsonify({"error", str(e)}), 400
