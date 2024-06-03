@@ -318,7 +318,7 @@ class ImagePersonClassifier:
                 user = dbconnect.findone("person", {"id": label, "isActive": 1})
                 if user != None:
                     user_name = f"{user['firstName']} {user['lastName']}"
-                    predicted.append({"rank": i+1, "label": user_name, "confidence": int(round(confidence))})
+                    predicted.append({"rank": i+1, "label": user_name, "confidence": int(round(confidence)), "id": label})
             return predicted
         except Exception as e:
             raise e
@@ -334,7 +334,7 @@ class ImagePersonClassifier:
             predicted = {}
             if user != None:
                 user_name = f"{user['firstName']} {user['lastName']}"
-                predicted = {"label": user_name, "confidence": predicted_percentage}
+                predicted = {"label": user_name, "confidence": predicted_percentage, "rank": 1, "id": label}
             return predicted
         except Exception as e:
             raise e

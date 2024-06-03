@@ -143,7 +143,7 @@ class PersonLBHClassifier(ImageLoader):
                         user = dbconnect.findone("person",{"id": labelx, "isActive": 1})
                         if user != None:
                             user_name = f"{user['firstName']} {user['lastName']}"
-                            predicted.append({"label": labelx, "confidence": confidence,"person":user_name})
+                            predicted.append({"id": labelx, "confidence": confidence,"label":user_name})
             return predicted
         except Exception as e:
             raise e
