@@ -21,7 +21,7 @@ audio_schema = {
 train_schema = {
     "type": "object",
     "properties": {
-        "version": {"type": "string", "enum": ["v1", "v2"]},
+        "version": {"type": "string", "enum": ["v1", "v2", "v3"]},
         "activation": {"type": "string", "enum": ["relu", "sigmoid"]},
         "remove": {"type": "number", "enum": [0, 1]},
         "download": {"type": "number", "enum": [0, 1]},

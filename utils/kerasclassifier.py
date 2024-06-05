@@ -7,6 +7,8 @@ import pathlib as pl
 import keras
 from conn.connector import Connection
 from keras.preprocessing.image import ImageDataGenerator
+from keras.applications import VGG16
+from keras.layers import Dense, Flatten, Dropout, BatchNormalization
 
 dbconnect = Connection()
 
@@ -22,33 +24,74 @@ class ImagePersonClassifier:
 
     def _load_local_dataset(self, path, target_size=(224, 224), batch_size=32):
         """
-        This function loads images from a dataset like (mainfolder->foldername,foldername):
-        - This functions loads the image and appends it to the images array which is later converted to numpy array
-        - The function aswell saves the labels of the folder per images and also creates numerical labels \n
-
-        Parameters:
-        - path -> local images main folder path.
-        - target_size -> tuple for the size of the image to be reshaped to default is (224,224)
-        - batch_size -> batch size for the dataset \n
-
-        Returns:
-        - np.array: The processed images,labels,numericallabels.
+        This function loads images from a dataset with data augmentation.
         """
         try:
             data_dir = pl.Path(path)
-            # training dataset
-            train_dataset = keras.utils.image_dataset_from_directory(
-                data_dir, validation_split=0.2, subset="training", seed=123,
-                image_size=target_size, batch_size=batch_size)
-
-            # validation dataset
-            val_dataset = keras.utils.image_dataset_from_directory(
-                data_dir, validation_split=0.2, subset="validation", seed=123,
-                image_size=target_size, batch_size=batch_size
+            datagen = ImageDataGenerator(
+                rescale=1./255,
+                validation_split=0.2,
+                rotation_range=20,
+                width_shift_range=0.2,
+                height_shift_range=0.2,
+                shear_range=0.2,
+                zoom_range=0.2,
+                horizontal_flip=True,
+                fill_mode='nearest'
             )
+
+            train_dataset = datagen.flow_from_directory(
+                data_dir,
+                target_size=target_size,
+                batch_size=batch_size,
+                class_mode='sparse',
+                subset='training'
+            )
+
+            val_datagen = ImageDataGenerator(rescale=1./255, validation_split=0.2)
+
+            val_dataset = val_datagen.flow_from_directory(
+                data_dir,
+                target_size=target_size,
+                batch_size=batch_size,
+                class_mode='sparse',
+                subset='validation'
+            )
+
             return train_dataset, val_dataset
         except Exception as e:
             raise e
+
+    # def _load_local_dataset(self, path, target_size=(224, 224), batch_size=32):
+    #     """
+    #     This function loads images from a dataset like (mainfolder->foldername,foldername):
+    #     - This functions loads the image and appends it to the images array which is later converted to numpy array
+    #     - The function aswell saves the labels of the folder per images and also creates numerical labels \n
+
+    #     Parameters:
+    #     - path -> local images main folder path.
+    #     - target_size -> tuple for the size of the image to be reshaped to default is (224,224)
+    #     - batch_size -> batch size for the dataset \n
+
+    #     Returns:
+    #     - np.array: The processed images,labels,numericallabels.
+    #     """
+    #     try:
+    #         data_dir = pl.Path(path)
+            
+    #         # training dataset
+    #         train_dataset = keras.utils.image_dataset_from_directory(
+    #             data_dir, validation_split=0.2, subset="training", seed=123,
+    #             image_size=target_size, batch_size=batch_size)
+
+    #         # validation dataset
+    #         val_dataset = keras.utils.image_dataset_from_directory(
+    #             data_dir, validation_split=0.2, subset="validation", seed=123,
+    #             image_size=target_size, batch_size=batch_size
+    #         )
+    #         return train_dataset, val_dataset
+    #     except Exception as e:
+    #         raise e
 
     def _create_model_v1(self, num_classes, input_shape=(224, 224,3), activation="relu"):
         """
@@ -232,20 +275,30 @@ class ImagePersonClassifier:
         - keras.Sequential: The created model
         """
         try:
+            base_model = VGG16(include_top=False, input_shape=input_shape, weights='imagenet')
+            base_model.trainable = False
+            # model = Sequential([
+            #     layers.Rescaling(1./255, input_shape=input_shape),
+            #     layers.Conv2D(16, 3, kernel_regularizer=keras.regularizers.l2(0.0001), padding="same", activation=activation),
+            #     layers.MaxPool2D(),
+            #     layers.Conv2D(32, 3, padding="same", activation=activation),
+            #     layers.MaxPool2D(),
+            #     layers.Conv2D(64, 3, padding="same", activation=activation),
+            #     layers.MaxPool2D(),
+            #     layers.Conv2D(128, 3, padding="same", activation=activation),
+            #     layers.MaxPool2D(),
+            #     layers.Flatten(),
+            #     layers.Dense(256, kernel_regularizer=keras.regularizers.l2(0.0001), activation=activation),
+            #     layers.Dropout(0.7),
+            #     layers.Dense(num_classes, activation='softmax')
+            # ])
             model = Sequential([
-                layers.Rescaling(1./255, input_shape=input_shape),
-                layers.Conv2D(16, 3, kernel_regularizer=keras.regularizers.l2(0.0001), padding="same", activation=activation),
-                layers.MaxPool2D(),
-                layers.Conv2D(32, 3, padding="same", activation=activation),
-                layers.MaxPool2D(),
-                layers.Conv2D(64, 3, padding="same", activation=activation),
-                layers.MaxPool2D(),
-                layers.Conv2D(128, 3, padding="same", activation=activation),
-                layers.MaxPool2D(),
-                layers.Flatten(),
-                layers.Dense(256, kernel_regularizer=keras.regularizers.l2(0.0001), activation=activation),
-                layers.Dropout(0.7),
-                layers.Dense(num_classes, activation='softmax')
+                base_model, 
+                Flatten(), 
+                Dense(256, activation=activation),
+                BatchNormalization(),
+                Dropout(0.5),
+                Dense(num_classes, activation='softmax')
             ])
             return model
         except Exception as e:
@@ -314,7 +367,10 @@ class ImagePersonClassifier:
                     "The predict_dict does not contain the required keys")
             # get the top 4 indices and confidences
             for i, (index, confidence) in enumerate(zip(predict_dict["top_4_indices"], predict_dict["confidence_percentages"]), 1):
-                label = class_labels[index]
+                if isinstance(class_labels, dict):
+                    label = list(class_labels.keys())[list(class_labels.values()).index(index)]
+                else:
+                    label = class_labels[index]
                 user = dbconnect.findone("person", {"id": label, "isActive": 1})
                 if user != None:
                     user_name = f"{user['firstName']} {user['lastName']}"
@@ -329,7 +385,10 @@ class ImagePersonClassifier:
             predicted_class = predict['predicted_class_index']
             # predicted_confidence = predict['predictclass_confidence']
             predicted_percentage = int(round(predict['predicted_class_percentage']))
-            label = class_labels[predicted_class]
+            if isinstance(class_labels, dict):
+                label = list(class_labels.keys())[list(class_labels.values()).index(predicted_class)]
+            else:
+                label = class_labels[predicted_class]
             user = dbconnect.findone("person", {"id": label, "isActive": 1})
             predicted = {}
             if user != None:

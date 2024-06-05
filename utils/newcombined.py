@@ -5,6 +5,8 @@ from conn.connector import Connection
 from utils.kerasclassifier import ImagePersonClassifier
 import os
 from keras.losses import SparseCategoricalCrossentropy
+import numpy as np
+import base64
 
 dbconnect = Connection()
 
@@ -28,6 +30,12 @@ class PersonImageClassifier(PersonLBHClassifier, ImagePersonClassifier):
             #check if image_file contains htpp or https
             if image_file.startswith("http"):
                image = self._read_image_from_url(image_file)
+            elif image_file.startswith("data:image"):
+                base64_str = image_file.split(',')[1]
+                img = base64.b64decode(base64_str)
+                nparr = np.frombuffer(img, np.uint8)
+                image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+                image = cv2.resize(image, self.target_size)
             else:
                 image = cv2.imread(image_file)
                 image = cv2.resize(image, self.target_size)
@@ -60,8 +68,10 @@ class PersonImageClassifier(PersonLBHClassifier, ImagePersonClassifier):
             model = None
             if version == "vl":
                 model = self._create_model_v1(num_classes, input_shape=(self.input_shape), activation=activation)
-            else:
+            elif version == "v2":
                model = self._create_model_v2(num_classes, input_shape=(self.input_shape), activation=activation)
+            else:
+                model = self._create_model_v3(num_classes, input_shape=(self.input_shape), activation=activation)
             
             if model is None:
                 raise Exception("Model not found")

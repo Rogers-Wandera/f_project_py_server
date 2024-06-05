@@ -50,11 +50,30 @@ def read_image_from_url(json_data):
         return image_file_data
     except Exception as e:
         raise e
+    
+def read_image_from_blob(json_data):
+    try:
+        imagedata = json_data['image']
+        image_file_data = None
+        if imagedata is None:
+            raise Exception("No image provided")
+        required_keys = ['blob']
+
+        if not all(key in imagedata for key in required_keys):
+           raise Exception("Missing required keys")
+        
+        image_file_data = imagedata['blob']
+
+        if image_file_data is None:
+            raise ("Failed to read image file")
+        return image_file_data
+    except Exception as e:
+        raise e
 
 
 def PredictPerson():
     try:
-        accepted_types = ["url_image", "local_image"]
+        accepted_types = ["url_image", "local_image", "blob"]
         if not request.json:
             return jsonify({"error": "No Json data provided"}), 400
         json_data = request.json
@@ -67,8 +86,10 @@ def PredictPerson():
         image_file_data = None
         if json_data['type'] == "url_image":
             image_file_data = read_image_from_url(json_data)
-        else:
+        elif json_data['type'] == "local_image":
             image_file_data = get_local_image(json_data)
+        else:
+            image_file_data = read_image_from_blob(json_data)
         
         if image_file_data is None:
             return jsonify({"error": "Failed to read image file"}), 400
@@ -93,7 +114,11 @@ def TrainClassifier():
         if request.json['download'] == 1:
             downloaded = new_classifier._get_read_images("persons")
         train_ds, val_ds = new_classifier._load_local_dataset("persons", target_size=(224, 224), batch_size=32)
-        classes = train_ds.class_names
+        if version == "v3":
+            classes = train_ds.class_indices
+        else:
+            classes = train_ds.class_names
+       
         num_classes = len(classes)
         new_classifier._save_kr_labels(classes)
         new_classifier._train_lbh_model("persons")
@@ -120,7 +145,7 @@ def RealTimeDetection():
 def CheckVariants():
     try:
         download = 1
-        remove = 1
+        remove = 0
         save_folder_path = os.path.join(os.getcwd(), "persons")
         if os.path.exists(save_folder_path):
            download = 0
