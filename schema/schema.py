@@ -27,3 +27,12 @@ train_schema = {
         "download": {"type": "number", "enum": [0, 1]},
     }
 }
+
+live_schema = {
+    "type": "object",
+    "properties": {
+        "userId": {"type": "string"},
+        "stream": {"type": "boolean"}
+    },
+    "required": ["userId", "stream"]
+}

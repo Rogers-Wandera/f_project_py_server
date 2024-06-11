@@ -29,7 +29,7 @@ class PersonImageClassifier(PersonLBHClassifier, ImagePersonClassifier):
             image = None
             #check if image_file contains htpp or https
             if image_file.startswith("http"):
-               image = self._read_image_from_url(image_file)
+               image = self._read_image_from_url(image_file, self.target_size)
             elif image_file.startswith("data:image"):
                 base64_str = image_file.split(',')[1]
                 img = base64.b64decode(base64_str)
@@ -48,8 +48,8 @@ class PersonImageClassifier(PersonLBHClassifier, ImagePersonClassifier):
             if image is None:
                 raise Exception("Image not found")
             
-            lbhpredictions = self._predict_image_lbh(image,self.lbhmodel)
-            krpredictions = self._predict_with_image_kr(image,self.krmodel)
+            lbhpredictions = self._predict_image_lbh(image,self.lbhmodel, self.target_size)
+            krpredictions = self._predict_with_image_kr(image,self.krmodel,input_shape=self.input_shape)
             return {"lbhpredictions": lbhpredictions, "krpredictions": krpredictions}
         except Exception as e:
             raise e
@@ -62,14 +62,22 @@ class PersonImageClassifier(PersonLBHClassifier, ImagePersonClassifier):
         except Exception as e:
             raise e
     def _train_kr_model(self, num_classes,train_ds, test_ds, version="v1", activation="relu",
-                        optimizer="adam", loss=SparseCategoricalCrossentropy(from_logits=True), metrics=["accuracy"],
+                        optimizer="adam", loss="sparse", metrics="accuracy",
                        show_summary=True, epochs=10):
        try:
             model = None
+            # modalpath = os.path.join(
+            #     os.getcwd(), "models", "models", f"{self.krmodel}.keras")
+            # if os.path.exists(modalpath): 
+            #     print("here")
+            #     history = self.ModelFineTune(self.krmodel, train_ds,test_ds,optimizer,loss,metrics,
+            #     show_summary,activation,num_classes,epochs)
+            #     return history
+            # else:
             if version == "vl":
                 model = self._create_model_v1(num_classes, input_shape=(self.input_shape), activation=activation)
             elif version == "v2":
-               model = self._create_model_v2(num_classes, input_shape=(self.input_shape), activation=activation)
+                model = self._create_model_v2(num_classes, input_shape=(self.input_shape), activation=activation)
             else:
                 model = self._create_model_v3(num_classes, input_shape=(self.input_shape), activation=activation)
             

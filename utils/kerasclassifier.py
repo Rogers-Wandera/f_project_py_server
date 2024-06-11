@@ -9,6 +9,7 @@ from conn.connector import Connection
 from keras.preprocessing.image import ImageDataGenerator
 from keras.applications import VGG16
 from keras.layers import Dense, Flatten, Dropout, BatchNormalization
+from keras.models import load_model
 
 dbconnect = Connection()
 
@@ -29,15 +30,16 @@ class ImagePersonClassifier:
         try:
             data_dir = pl.Path(path)
             datagen = ImageDataGenerator(
-                rescale=1./255,
+                 rescale=1./255,
                 validation_split=0.2,
-                rotation_range=20,
+                rotation_range=40,
                 width_shift_range=0.2,
                 height_shift_range=0.2,
                 shear_range=0.2,
                 zoom_range=0.2,
                 horizontal_flip=True,
-                fill_mode='nearest'
+                fill_mode='nearest',
+                brightness_range=[0.8,1.2],
             )
 
             train_dataset = datagen.flow_from_directory(
@@ -120,8 +122,8 @@ class ImagePersonClassifier:
         except Exception as e:
             raise e
 
-    def _compile_model(self, model, optimizer="adam", loss=keras.losses.SparseCategoricalCrossentropy(from_logits=True), metrics=["accuracy"],
-                       show_summary=True):
+    def _compile_model(self, model, optimizer="adam", loss="sparse", metrics="accuracy",
+                       show_summary=True,learning_rate=None):
         """
         This function compiles the model with the given parameters \n
         Parameters:
@@ -134,6 +136,19 @@ class ImagePersonClassifier:
         - model -> The compiled model
         """
         try:
+            if optimizer == "adam":
+                if learning_rate is None:
+                    optimizer = keras.optimizers.Adam()
+                else:
+                    optimizer = keras.optimizers.Adam(learning_rate)
+            if loss == "sparse":
+                loss = keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+            elif loss == "binary":
+                loss = keras.losses.BinaryCrossentropy(from_logits=True)
+            if metrics == "accuracy" and loss == "binary":
+                metrics = [keras.metrics.BinaryAccuracy()]
+            elif metrics == "accuracy" and loss == "sparse":
+                metrics = [keras.metrics.CategoricalAccuracy()]
             model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
             if show_summary:
                 model.summary()
@@ -308,7 +323,7 @@ class ImagePersonClassifier:
         try:
             modalpath = os.path.join(
                 os.getcwd(), "models", "models", f"{model_name}.keras")
-            model = keras.models.load_model(modalpath)
+            model = load_model(modalpath)
             return model
         except Exception as e:
             raise e
@@ -395,5 +410,24 @@ class ImagePersonClassifier:
                 user_name = f"{user['firstName']} {user['lastName']}"
                 predicted = {"label": user_name, "confidence": predicted_percentage, "rank": 1, "id": label}
             return predicted
+        except Exception as e:
+            raise e
+    
+    def ModelFineTune(self, model_save_path,train_dataset, val_dataset,optimizer,loss,metrics,show_summary,
+                      activation,num_classes, epochs=10):
+        try:
+            model = self._load_model(model_save_path)
+            model.trainable = False
+            model = Sequential([
+                model, 
+                Flatten(), 
+                Dense(256, activation=activation),
+                BatchNormalization(),
+                Dropout(0.5),
+                Dense(num_classes, activation='softmax')
+            ])
+            model = self._compile_model(model, optimizer=optimizer, loss=loss, metrics=metrics, show_summary=show_summary)
+            history = self._train_model(model, train_dataset,val_dataset,model_save_path,epochs=epochs)
+            return history
         except Exception as e:
             raise e

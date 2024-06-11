@@ -2,11 +2,22 @@ from utils.classifier import PersonClassifier
 from flask import request, jsonify
 import os
 from utils.newcombined import PersonImageClassifier
-from schema.schema import train_schema
+from schema.schema import train_schema,live_schema
 from jsonschema import validate,ValidationError
+import numpy as np
+import cv2
+import io
+import threading
+from conn.connector import Connection
+from sockets.sockets import socketinstance
+import base64
+
+dbcon = Connection()
 
 ClassifierObj = PersonClassifier()
 new_classifier = PersonImageClassifier("lhb_person_model", "kr_person_model", input_shape=(224,224, 3), target_size=(224, 224))
+
+video_stream = {}
 
 def get_local_image(json_data):
     try:
@@ -117,7 +128,8 @@ def TrainClassifier():
         if version == "v3":
             classes = train_ds.class_indices
         else:
-            classes = train_ds.class_names
+            # classes = train_ds.class_names
+            classes = train_ds.class_indices
        
         num_classes = len(classes)
         new_classifier._save_kr_labels(classes)
@@ -135,13 +147,19 @@ def TrainClassifier():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-def RealTimeDetection():
+def RealTimeDetection(userId):
     try:
-        new_classifier._realtime_detect(video_url=0)
-        return jsonify({"msg": "Realtime detection ended successfully"}), 200
+        global video_stream
+        socket = socketinstance.getSocket()
+        video_Capture = cv2.VideoCapture(0)
+        while video_stream.get(userId, False):
+            ret, frame = video_Capture.read()
+            if not ret:
+                break
+            new_classifier._realtime_detection("lhb_person_model", frame=frame, socket=socket, userId=userId)
     except Exception as e:
-        return jsonify({"error": str(e)}), 400
-
+        raise e
+    
 def CheckVariants():
     try:
         download = 1
@@ -152,3 +170,37 @@ def CheckVariants():
         return jsonify({"download": download, "remove": remove})
     except Exception as e:
         return jsonify({"error", str(e)}), 400
+    
+
+def startStream():
+    try:
+        global video_stream
+        validate(schema=live_schema, instance=request.json)
+        userId = request.json['userId']
+        stream = request.json['stream']
+        user = dbcon.findone("users", {"id": userId})
+        if user is None:
+            raise Exception("No user found, ensure you have the right credentials")
+        if not stream:
+            raise Exception("Stream must be true to start")
+        if userId in video_stream:
+            stream = True
+        video_stream[userId] = stream
+        threading.Thread(target=RealTimeDetection, args=(userId,)).start()
+        return jsonify({"msg": "Stream started successfully for " + f"{user['firstname']} {user['lastname']}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
+    
+def stopStream():
+    try:
+        global video_stream
+        userId = request.json['userId']
+        user = dbcon.findone("users", {"id": userId})
+        if user is None:
+            raise Exception("No user found, ensure you have the right credentials")
+        if userId not in video_stream or not video_stream[userId]:
+            return jsonify({"error": "No active stream for this user."}), 400
+        video_stream[userId] = False
+        return jsonify({"msg": "Stream stopped successfully for user: " + f"{user['firstname']} {user['lastname']}"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 400
