@@ -13,6 +13,10 @@ from socketio import Client
 dbconnect = Connection()
 
 class PersonLBHClassifier(ImageLoader):
+    # def __init__(self):
+    #     super().__init__()
+    #     self.lbhlabels = self.load_label_mapping("lhb_person_model")
+    #     self.recognizer = self._load_recognizer("lhb_person_model")
     def ImageAugmentation(self):
         return iaa.Sequential([
             iaa.Fliplr(0.5),
@@ -185,59 +189,53 @@ class PersonLBHClassifier(ImageLoader):
             cv2.rectangle(vid, (x1, y1), (x2, y2), (0, 255, 0), 4)
         return faces
     
-    def _realtime_detection(self, modalname, frame,socket:Client,userId):
+    def _realtime_detection(self, frame, socket: Client, userId, recognizer=None, label_mapping=None):
         try:
-            # label_mapping = self.load_label_mapping(modalname)
-            # recognizer = self._load_recognizer(modalname)
-                faces = self.detect_bounding_box(frame)
-            # for face in faces:
-            #     face_roi = frame[face[1]: face[1] + face[3], face[0]: face[0] + face[2]]
-            #     gray_image = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
-                # label, confidence = recognizer.predict(gray_image)
-                # user = None
-                # nameprefix = None
-                # for labelx in label_mapping:
-                #     if label_mapping[labelx] == label:
-                #         userdata = dbconnect.findone("person", {"id": labelx, "isActive": 1})
-                #         if userdata is not None:
-                #             user = f"{userdata['firstName']} {userdata['lastName']}"
-                #             nameprefix = f"{userdata['firstName'][0]}.{userdata['lastName'][0]}"
-                #             label = labelx
-                #     prefix = "Unknown" if user is None else nameprefix
-                #     text = f"{prefix}: {confidence:.2f}"
-                    # cv2.putText(frame, text, (face[0], face[1] - 10),
-                    #             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                _, buffer = cv2.imencode('.jpg', frame)
-                frame_data = base64.b64encode(buffer).decode('utf-8')
-                socket.emit("videostream", {"userId": userId, "frame": frame_data}) 
-                socket.sleep(0.1)  # To control the frame rate
-        except Exception as e:
-            raise e
-        
-    def process_video_chunk(self,chunk):
-        try:
-            if not isinstance(chunk, (bytes, bytearray)):
-                raise ValueError("Chunk is not a bytes-like object.")
-            print("Chunk length:", len(chunk))
+            # Load label mappings and recognizer
+            if recognizer is None or label_mapping is None:
+                raise Exception("Recognizer or label mapping is not loaded")
             
-            # Convert the chunk to a numpy array
-            np_arr = np.frombuffer(chunk, np.uint8)
-            array = np.asarray(bytearray(chunk), dtype=np.uint8)
-            print(array)
-            print("Buffer shape:", array.shape)
+            # Detect faces in the frame
+            faces = self.detect_bounding_box(frame)
             
-            # Decode the numpy array as an image
-            img = cv2.imdecode(array, cv2.IMREAD_COLOR)
-            if img is None:
-                raise ValueError("Image decoding failed. The buffer might not contain valid image data.")
-            print("Image shape:", img.shape)
+            for face in faces:
+                # Extract face region of interest (ROI)
+                face_roi = frame[face[1]: face[1] + face[3], face[0]: face[0] + face[2]]
+                
+                # Convert to grayscale for recognition
+                gray_image = cv2.cvtColor(face_roi, cv2.COLOR_BGR2GRAY)
+                label, confidence = recognizer.predict(gray_image)
+                
+                # Initialize user info
+                user = None
+                nameprefix = None
+                
+                # Match label with user data
+                for labelx in label_mapping:
+                    if label_mapping[labelx] == label:
+                        userdata = dbconnect.findone("person", {"id": labelx, "isActive": 1})
+                        if userdata is not None:
+                            user = f"{userdata['firstName']} {userdata['lastName']}"
+                            nameprefix = f"{userdata['firstName'][0]}.{userdata['lastName'][0]}"
+                            label = labelx
+                            
+                # Prepare text for annotation
+                prefix = "Unknown" if user is None else nameprefix
+                text = f"{prefix}: {confidence:.2f}"
+                
+                # Annotate the frame with the text
+                text_position = (face[0], face[1] - 10)
+                cv2.putText(frame, text, text_position, cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
             
-            return img
-        except Exception as e:
-            raise ValueError("Error processing video chunk:", e)
+            # Encode frame to JPEG
+            _, buffer = cv2.imencode('.jpg', frame)
+            frame_data = base64.b64encode(buffer).decode('utf-8')
+            
+            # Emit the frame through the socket
+            socket.emit("videostream", {"userId": userId, "frame": frame_data})
+            
+            # Control frame rate
+            socket.sleep(0.1)
     
-    def realTimeDetection(self, chunk):
-        try:
-           print("yes") 
         except Exception as e:
-            raise e
+            print(f"Error during real-time detection: {e}")

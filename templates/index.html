@@ -16,7 +16,7 @@
       const canvas = document.getElementById("videoCanvas");
       const context = canvas.getContext("2d");
 
-      socket.on("video_frame", (data) => {
+      socket.on("videostream", (data) => {
         const img = new Image();
         img.src = `data:image/jpeg;base64,${data.frame}`;
         img.onload = () => {

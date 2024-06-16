@@ -4,18 +4,16 @@ import os
 from utils.newcombined import PersonImageClassifier
 from schema.schema import train_schema,live_schema
 from jsonschema import validate,ValidationError
-import numpy as np
 import cv2
-import io
 import threading
 from conn.connector import Connection
 from sockets.sockets import socketinstance
-import base64
-
 dbcon = Connection()
 
 ClassifierObj = PersonClassifier()
 new_classifier = PersonImageClassifier("lhb_person_model", "kr_person_model", input_shape=(224,224, 3), target_size=(224, 224))
+lbhlabels = new_classifier.load_label_mapping("lhb_person_model")
+lbhrecognizer = new_classifier._load_recognizer("lhb_person_model")
 
 video_stream = {}
 
@@ -156,7 +154,7 @@ def RealTimeDetection(userId):
             ret, frame = video_Capture.read()
             if not ret:
                 break
-            new_classifier._realtime_detection("lhb_person_model", frame=frame, socket=socket, userId=userId)
+            new_classifier._realtime_detection(frame=frame, socket=socket, userId=userId, recognizer=lbhrecognizer, label_mapping=lbhlabels)
     except Exception as e:
         raise e
     

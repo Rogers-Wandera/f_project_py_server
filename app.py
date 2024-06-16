@@ -4,20 +4,26 @@ from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
 from flask_socketio import SocketIO
+from flask_cors import CORS
 import threading
 import cv2
 import base64
 from sockets.sockets import socketinstance
+from utils.lbhclassifier import PersonLBHClassifier
 
 load_dotenv()
 app = Flask(__name__)
 app = CreateApp(app)
+CORS(app, resources={r"/socket.io/*": {"origins": "http://localhost:5173"}})
+
 JWT_SECRET = os.getenv('JWT_SECRET')
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_SECRET_KEY'] = JWT_SECRET
 
-socket = SocketIO(app=app)
+socket = SocketIO(app=app, cors_allowed_origins=["http://localhost:5173", "http://localhost:5000"])
 sio = socketinstance.initialize()
+
+pcl = PersonLBHClassifier()
 
 video_stream = False
 
@@ -45,11 +51,12 @@ def capture_and_stream():
 
         if not ret:
             break
-        _, buffer = cv2.imencode('.jpg', frame)
-        frame_data = base64.b64encode(buffer).decode('utf-8')
-        socket.emit('video_frame', {'frame': frame_data})
-        sio.emit('video_frame', {'frame': frame_data})
-        socket.sleep(0.1)  # To control the frame rate
+        pcl._realtime_detection("lhb_person_model", frame=frame, socket=socket, userId=1)
+        # _, buffer = cv2.imencode('.jpg', frame)
+        # frame_data = base64.b64encode(buffer).decode('utf-8')
+        # socket.emit('video_frame', {'frame': frame_data})
+        # sio.emit('video_frame', {'frame': frame_data})
+        # socket.sleep(0.1)  # To control the frame rate
     video_capture.release()
 
 @socket.on("startvideo")
