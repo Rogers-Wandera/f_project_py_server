@@ -4,7 +4,7 @@ from keras.callbacks import ReduceLROnPlateau
 from conn.connector import Connection
 import numpy as np
 import math
-
+import matplotlib.pyplot as plt
 connect = Connection()
 class PersonAudio(MainAudioClassifier):
     def __init__(self, label_path, model_path):
@@ -13,6 +13,7 @@ class PersonAudio(MainAudioClassifier):
         self.label_path = os.path.join(self.mainmodalpath, "labels", f"{label_path}.json")
         self.model_path = os.path.join(self.mainmodalpath, "models", f"{model_path}.keras")
         self.types = ["local", "cloudinary"]
+        self.trainedItemsCount = 0
 
         # create path if not exists
         if not os.path.exists(self.mainmodalpath):
@@ -54,10 +55,10 @@ class PersonAudio(MainAudioClassifier):
             label_mappings = {user_id: idx for idx, user_id in enumerate(self.labels)}
             self._save_label_mappings(label_mappings, self.label_path)
 
-            model.fit(X_train,y_train, validation_data=(X_test, y_test), epochs=10, batch_size=3, callbacks=callbacks)
-
+            results = model.fit(X_train,y_train, validation_data=(X_test, y_test), epochs=10, batch_size=3, callbacks=callbacks)
+            self.trainedItemsCount = len(X_train)
             # save model
-            return model.save(self.model_path)
+            return model.save(self.model_path), results
         except Exception as e:
             raise e
 
@@ -65,14 +66,16 @@ class PersonAudio(MainAudioClassifier):
     def _train_model_on_local_data(self, filepath,max_pad_len=174, test_size=0.2, random_state=42):
         try:
             X_train, X_test, y_train, y_test = self._load_local_dataset(path=filepath,max_pad_len=max_pad_len,test_size=test_size,random_state=random_state)
-            self._train_model(X_train, X_test, y_train, y_test)
+            data = self._train_model(X_train, X_test, y_train, y_test)
+            return data[1]
         except Exception as e:
             raise e
     
     def _train_model_on_cloudinary_data(self, path, max_pad_len=174, test_size=0.2, random_state=42):
         try:
             X_train,X_test,y_train,y_test = self._load_cloudinary_dataset(path,max_pad_len,test_size,random_state)
-            self._train_model(X_train, X_test, y_train, y_test)
+            data =  self._train_model(X_train, X_test, y_train, y_test)
+            return data[1]
         except Exception as e:
             raise e
         
@@ -82,9 +85,9 @@ class PersonAudio(MainAudioClassifier):
             if type not in self.types:
                 raise ValueError("Invalid type. Supported types: local, cloudinary")
             if type == "local":
-                self._train_model_on_local_data(path, max_pad_len, test_size, random_state)
+                return self._train_model_on_local_data(path, max_pad_len, test_size, random_state)
             elif type == "cloudinary":
-                self._train_model_on_cloudinary_data(path, max_pad_len, test_size, random_state)
+                return self._train_model_on_cloudinary_data(path, max_pad_len, test_size, random_state)
         except Exception as e:
             raise e
     
@@ -93,9 +96,9 @@ class PersonAudio(MainAudioClassifier):
             if type not in self.types:
                 raise ValueError("Invalid type. Supported types: local, cloudinary")
             if type == "local":
-                self._train_model_on_local_data(path, max_pad_len, test_size, random_state)
+                return self._train_model_on_local_data(path, max_pad_len, test_size, random_state)
             elif type == "cloudinary":
-                self._train_model_on_cloudinary_data(path, max_pad_len, test_size, random_state)
+                return self._train_model_on_cloudinary_data(path, max_pad_len, test_size, random_state)
         except Exception as e:
             raise e
     
@@ -141,7 +144,7 @@ class PersonAudio(MainAudioClassifier):
                user = connect.findone("person", {"id": predicted_label, "isActive": 1})
                if user != None:
                    user_name = f"{user['firstName']} {user['lastName']}"
-                   predictedPerson = {"label": user_name, "confidence": percentage_confidence}
+                   predictedPerson = {"label": user_name, "confidence": percentage_confidence, "id": predicted_label}
             
             if len(top_indices) > 0:
                for label, con, perc in top_labels:
@@ -150,7 +153,7 @@ class PersonAudio(MainAudioClassifier):
                        if user != None:
                            user_name = f"{user['firstName']} {user['lastName']}"
                         #    percentg_conf = round(confidence * 100, 1)
-                           otherpredictions.append({"label": user_name, "confidence": perc})
+                           otherpredictions.append({"label": user_name, "confidence": perc, "id": label})
             return predictedPerson,otherpredictions
         except Exception as e:
             raise e
@@ -191,6 +194,53 @@ class PersonAudio(MainAudioClassifier):
                 "top_4_indices_labels": top_4_indices_labels
             }
             return predict_dict
+        except Exception as e:
+            raise e
+        
+
+    def _evaluate_model(self, history):
+        """
+        This function evaluates the model and returns the evaluation \n
+        Parameters:
+        - history -> The history of the model \n
+        Returns:
+        - evaluation_dict -> The evaluation of the model containing train and test accuracy and their losses
+        """
+        try:
+            # train accuracy and loss
+            train_accuracy = history.history['accuracy']
+            loss = history.history['loss']
+            # test accuracy and loss
+            test_accuracy = history.history['val_accuracy']
+            val_loss = history.history['val_loss']
+            evaluation_dict = {
+                "train_evaluation": (train_accuracy, loss),
+                "test_evaluation": (test_accuracy, val_loss)
+            }
+            return evaluation_dict
+        except Exception as e:
+            raise e
+        
+    def _display_evaluation(self,history):
+        try:
+           # accuracy
+            eval_dict = self._evaluate_model(history)
+            train_accuracy = eval_dict["train_evaluation"][0]
+            test_accuracy =  eval_dict["test_evaluation"][0]
+
+            # loss
+            loss = eval_dict["train_evaluation"][1]
+            val_loss = eval_dict["test_evaluation"][1]
+
+            print(f"Test Accuracy: {test_accuracy[-1] * 100:.2f}%")
+            print(f"Loss: {val_loss[-1]}")
+
+            print(f"Train Accuracy: {train_accuracy[-1] * 100:.2f}%")
+            print(f"Loss: {loss[-1]}")
+            return {
+                "Test": [f"Test Accuracy: {test_accuracy[-1] * 100:.2f}%", f"Loss: {val_loss[-1]}"],
+                "Train": [f"Train Accuracy: {train_accuracy[-1] * 100:.2f}%", f"Loss: {loss[-1]}"]
+            }
         except Exception as e:
             raise e
 

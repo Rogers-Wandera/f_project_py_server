@@ -16,6 +16,11 @@ class ImageLoader:
             "secure": True
         }
         cloudinary.config(**self.cloudinaryconfig)
+        modeFile = os.path.join(os.getcwd(), "models", "models", "cafe.caffemodel")
+        configFile = os.path.join(os.getcwd(), "models", "models", "deploy.prototxt")
+        self.net = cv.dnn.readNetFromCaffe(configFile, modeFile)
+        if self.net is None:
+            raise Exception("Error loading network")
 
     
     def _face_detection(self, image, conf_threshold=0.8):
@@ -65,15 +70,15 @@ class ImageLoader:
         - np.array: The processed image.
         """
         try:
-            modeFile = os.path.join(os.getcwd(), "models", "models", "cafe.caffemodel")
-            configFile = os.path.join(os.getcwd(), "models", "models", "deploy.prototxt")
-            net = cv.dnn.readNetFromCaffe(configFile, modeFile)
-            if net is None:
+            # modeFile = os.path.join(os.getcwd(), "models", "models", "cafe.caffemodel")
+            # configFile = os.path.join(os.getcwd(), "models", "models", "deploy.prototxt")
+            # net = cv.dnn.readNetFromCaffe(configFile, modeFile)
+            if self.net is None:
                 raise Exception("Error loading network")
             blob = cv.dnn.blobFromImage(image=image, scalefactor=1.0, size=(
                 300, 300), mean=(104.0, 177.0, 123.0), swapRB=False, crop=False)
-            net.setInput(blob)
-            detections = net.forward()
+            self.net.setInput(blob)
+            detections = self.net.forward()
             bbox = []
             for i in range(detections.shape[2]):
                 confidence = detections[0, 0, i, 2]

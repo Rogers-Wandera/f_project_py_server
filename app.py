@@ -1,70 +1,81 @@
-from flask import jsonify, g
+from flask import jsonify, render_template, Flask
 from routes.approute import CreateApp
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 import os
-# from conn.config import config
-from utils.imageloader import ImageLoader
-# from utils.personaudio import PersonAudio
-from utils.kerasclassifier import ImagePersonClassifier
-from keras.preprocessing.image import ImageDataGenerator
+from flask_socketio import SocketIO
+from flask_cors import CORS
+import threading
+import cv2
+import base64
+from sockets.sockets import socketinstance
+from utils.lbhclassifier import PersonLBHClassifier
 
 load_dotenv()
+app = Flask(__name__)
+app = CreateApp(app)
+CORS(app, resources={r"/socket.io/*": {"origins": "http://localhost:5173"}})
 
-loaderimage = ImageLoader()
-# downloaded = loaderimage._get_read_images("persons")
-# print(downloaded)
-# loaderimage._remove_cloud_folder("persons")
-
-classifier = ImagePersonClassifier()
-# train_ds, test_ds = classifier._load_local_dataset(r"D:\user\sockets_web\person")
-# classes = train_ds.class_names
-# num_classes = len(classes)
-# model = classifier._create_model_v1(num_classes)
-# model = classifier._compile_model(model=model)
-# history = classifier._train_model(model, train_ds, test_ds, "models/models/personclassifierkeras")
-# evaluation = classifier._evaluate_model(history)
-# eval_display = classifier._display_evaluation(history)
-# print(eval_display)
-# obj = PersonAudio(label_path="personsaudiolabels",
-#                   model_path="personsaudiomodel")
-# pathurl = r"C:\Users\Rogers\Downloads\WhatsApp Unknown 2024-01-05 at 11.48.12 AM\test.ogg"
-# results = obj._predict_person_audio(pathurl)
-# print(results)
-# obj._train_person_audio_model("personsaudio", type="cloudinary")
-# X_train, X_test, y_train, y_test=obj._load_cloudinary_dataset("personsaudio", max_results=500)
-
-app = CreateApp()
 JWT_SECRET = os.getenv('JWT_SECRET')
-imageuploader = ImageLoader()
-
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_SECRET_KEY'] = JWT_SECRET
 
+socket = SocketIO(app=app, cors_allowed_origins=["http://localhost:5173", "http://localhost:5000"])
+sio = socketinstance.initialize()
+
+pcl = PersonLBHClassifier()
+
+video_stream = False
+
 jwt = JWTManager(app)
-
-# @app.before_request
-# def before_request():
-
 
 @app.errorhandler(404)
 def not_found_error(error):
     errordata = {"error": "Page not found"}
     return jsonify(errordata), 404
 
+@socket.on("connect")
+def SocketConnection():
+    print("a connection established")
+
+@sio.event
+def connect():
+    print('Connected to the server')
+
+def capture_and_stream():
+    global video_stream
+    video_capture = cv2.VideoCapture(0)
+
+    while video_stream:
+        ret, frame = video_capture.read()
+
+        if not ret:
+            break
+        pcl._realtime_detection("lhb_person_model", frame=frame, socket=socket, userId=1)
+        # _, buffer = cv2.imencode('.jpg', frame)
+        # frame_data = base64.b64encode(buffer).decode('utf-8')
+        # socket.emit('video_frame', {'frame': frame_data})
+        # sio.emit('video_frame', {'frame': frame_data})
+        # socket.sleep(0.1)  # To control the frame rate
+    video_capture.release()
+
+@socket.on("startvideo")
+def StartVideo():
+    global video_stream
+    if not video_stream:
+        video_stream = True
+        threading.Thread(target=capture_and_stream).start()
+
+@socket.on("stopvideo")
+def Stop_Video():
+    global video_stream
+    video_stream = False
+
+sio.connect("http://localhost:3500/")
 
 @app.route('/')
 def index():
-    image_loader = ImageLoader()
-    folder_path = "persons"
-
-    try:
-        images = image_loader.OrganizePersonImages(folder_path)
-        print(images)
-        return jsonify(images)
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

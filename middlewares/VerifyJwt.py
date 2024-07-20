@@ -11,7 +11,7 @@ def verifyjwt(request_function):
             if not auth_header.startswith("Bearer"):
                 return jsonify({"msg": "You are not authorized to access this route"}), 401
             Token = auth_header.split(" ")[1]
-            decoded = decode_token(Token)
+            decoded = decode_token(encoded_token=Token,allow_expired=True)
             if "exp" in decoded and decoded['exp'] < time.time():
                 raise exceptions.JWTDecodeError("Token has expired")
             user = decoded.get("user")
