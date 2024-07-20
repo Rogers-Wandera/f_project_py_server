@@ -144,7 +144,7 @@ class PersonAudio(MainAudioClassifier):
                user = connect.findone("person", {"id": predicted_label, "isActive": 1})
                if user != None:
                    user_name = f"{user['firstName']} {user['lastName']}"
-                   predictedPerson = {"label": user_name, "confidence": percentage_confidence}
+                   predictedPerson = {"label": user_name, "confidence": percentage_confidence, "id": predicted_label}
             
             if len(top_indices) > 0:
                for label, con, perc in top_labels:
@@ -153,7 +153,7 @@ class PersonAudio(MainAudioClassifier):
                        if user != None:
                            user_name = f"{user['firstName']} {user['lastName']}"
                         #    percentg_conf = round(confidence * 100, 1)
-                           otherpredictions.append({"label": user_name, "confidence": perc})
+                           otherpredictions.append({"label": user_name, "confidence": perc, "id": label})
             return predictedPerson,otherpredictions
         except Exception as e:
             raise e

@@ -19,8 +19,9 @@ def TrainAudioClassifier():
 def PredictAudio():
     try:
         validate(schema=audio_schema, instance=request.json)
-        prediction = audio._show_predicted_person(request.json['audio']['path'])
-        return jsonify({"predict": prediction}), 200
+        (predicted, others) = audio._show_predicted_person(request.json['audio']['path'])
+        prediction = {"predict": predicted, "others": others}
+        return jsonify(prediction), 200
     except ValidationError as ve:
         return jsonify({"error":ve.message}), 400
     except Exception as e:
