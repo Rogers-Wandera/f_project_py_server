@@ -52,6 +52,7 @@ class PersonAudio(MainAudioClassifier):
             reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=3, min_lr=1e-6)
             callbacks = [reduce_lr]
 
+            print(self.labels)
             label_mappings = {user_id: idx for idx, user_id in enumerate(self.labels)}
             self._save_label_mappings(label_mappings, self.label_path)
 
@@ -137,7 +138,6 @@ class PersonAudio(MainAudioClassifier):
             predicted = self._predicted_class(predictions)
             top_indices = predicted['top_4_indices']
             top_labels = predicted['top_4_indices_labels']
-            print(top_labels)
             predictedPerson = {}
             otherpredictions = []
             if predicted_label != "unknown":
@@ -145,6 +145,8 @@ class PersonAudio(MainAudioClassifier):
                if user != None:
                    user_name = f"{user['firstName']} {user['lastName']}"
                    predictedPerson = {"label": user_name, "confidence": percentage_confidence, "id": predicted_label}
+            else:
+                raise Exception("No person found")
             
             if len(top_indices) > 0:
                for label, con, perc in top_labels:

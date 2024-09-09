@@ -74,8 +74,8 @@ class PersonLBHClassifier(ImageLoader):
                             continue
                         for face in faces:
                             face = cv2.resize(face, target_size)
-                            face = cv2.fastNlMeansDenoising(
-                            face, None, h=10, templateWindowSize=5, searchWindowSize=21)
+                            # face = cv2.fastNlMeansDenoising(
+                            # face, None, h=10, templateWindowSize=5, searchWindowSize=21)
                             face = cv2.cvtColor(face, cv2.COLOR_BGR2GRAY)
                             # cv2.imshow("image", face)
                             # cv2.waitKey(0)
@@ -209,6 +209,7 @@ class PersonLBHClassifier(ImageLoader):
                 # Initialize user info
                 user = None
                 nameprefix = None
+                userdata = None
                 
                 # Match label with user data
                 for labelx in label_mapping:
@@ -232,7 +233,11 @@ class PersonLBHClassifier(ImageLoader):
             frame_data = base64.b64encode(buffer).decode('utf-8')
             
             # Emit the frame through the socket
-            socket.emit("videostream", {"userId": userId, "frame": frame_data})
+            socket.emit("videostream", {"userId": userId,
+            "userdata": {"firstName": userdata['firstName'],
+            "lastName": userdata['lastName'], "id": label, 
+            "confidence": confidence,"gender": userdata['gender'], 
+            "nationalId":userdata['nationalId']}, "frame": frame_data})
             
             # Control frame rate
             socket.sleep(0.1)

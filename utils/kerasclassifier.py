@@ -23,23 +23,23 @@ class ImagePersonClassifier:
         self.labels = []
         self.accuracy = 0
 
-    def _load_local_dataset(self, path, target_size=(224, 224), batch_size=32):
+    def _load_local_dataset(self, path, target_size=(224, 224), batch_size=16):
         """
         This function loads images from a dataset with data augmentation.
         """
         try:
             data_dir = pl.Path(path)
             datagen = ImageDataGenerator(
-                 rescale=1./255,
+                rescale=1./255,
                 validation_split=0.2,
-                rotation_range=40,
-                width_shift_range=0.2,
-                height_shift_range=0.2,
-                shear_range=0.2,
-                zoom_range=0.2,
+                rotation_range=20, 
+                width_shift_range=0.1,
+                height_shift_range=0.1,
+                shear_range=0.1,
+                zoom_range=0.1,
                 horizontal_flip=True,
                 fill_mode='nearest',
-                brightness_range=[0.8,1.2],
+                brightness_range=[0.9, 1.1]
             )
 
             train_dataset = datagen.flow_from_directory(

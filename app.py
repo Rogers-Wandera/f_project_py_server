@@ -7,7 +7,6 @@ from flask_socketio import SocketIO
 from flask_cors import CORS
 import threading
 import cv2
-import base64
 from sockets.sockets import socketinstance
 from utils.lbhclassifier import PersonLBHClassifier
 
@@ -52,11 +51,6 @@ def capture_and_stream():
         if not ret:
             break
         pcl._realtime_detection("lhb_person_model", frame=frame, socket=socket, userId=1)
-        # _, buffer = cv2.imencode('.jpg', frame)
-        # frame_data = base64.b64encode(buffer).decode('utf-8')
-        # socket.emit('video_frame', {'frame': frame_data})
-        # sio.emit('video_frame', {'frame': frame_data})
-        # socket.sleep(0.1)  # To control the frame rate
     video_capture.release()
 
 @socket.on("startvideo")
